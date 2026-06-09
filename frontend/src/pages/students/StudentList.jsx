@@ -642,24 +642,202 @@ function ParentsTab({ parents, students, onRefresh }) {
     );
 }
 
+// ─── SIRS TAB ──────────────────────────────────────────────────────────────
+function SirsTab({ sirs, onRefresh }) {
+    const [search, setSearch] = useState('');
+    const [expanded, setExpanded] = useState(null);
+    const [showAdd, setShowAdd] = useState(false);
+    const [editSir, setEditSir] = useState(null);
+    const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const filtered = sirs.filter(s =>
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        (s.email && s.email.toLowerCase().includes(search.toLowerCase()))
+    );
+
+    const openAdd = () => {
+        setForm({ name: '', email: '', password: '', phone: '' });
+        setError(''); setShowAdd(true);
+    };
+
+    const openEdit = (s) => {
+        setEditSir(s);
+        setForm({ name: s.name || '', phone: s.phone || '' });
+        setError('');
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault(); setSaving(true); setError('');
+        try {
+            if (editSir) {
+                await api.patch(`/users/sirs/${editSir._id}`, { name: form.name, phone: form.phone });
+            } else {
+                await api.post('/users/sirs', form);
+            }
+            await onRefresh();
+            setShowAdd(false); setEditSir(null);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to save');
+        } finally { setSaving(false); }
+    };
+
+    const toggleActive = async (s) => {
+        try {
+            await api.patch(`/users/sirs/${s._id}`, { isActive: !s.isActive });
+            onRefresh();
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to change status');
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex gap-2">
+                <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl"
+                    style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(193,68,14,0.12)' }}>
+                    <Search size={14} color="#C1440E" opacity={0.6} />
+                    <input value={search} onChange={e => setSearch(e.target.value)}
+                        placeholder="Search sirs/admins..."
+                        className="flex-1 text-sm outline-none bg-transparent"
+                        style={{ color: '#2C1810' }} />
+                </div>
+                <button onClick={openAdd}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold flex-shrink-0"
+                    style={{ backgroundColor: '#C1440E', color: '#F5F0E8' }}>
+                    <Plus size={15} /> Add
+                </button>
+            </div>
+
+            <p className="text-xs px-1" style={{ color: '#2C1810', opacity: 0.5 }}>
+                {filtered.length} sir{filtered.length !== 1 ? 's' : ''}
+            </p>
+
+            {filtered.length === 0 ? (
+                <div className="rounded-2xl p-12 text-center" style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
+                    <UserPlus size={36} color="#C1440E" opacity={0.2} className="mx-auto mb-2" />
+                    <p className="text-sm" style={{ color: '#2C1810', opacity: 0.5 }}>No admins found</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {filtered.map(s => {
+                        const isOpen = expanded === s._id;
+                        return (
+                            <div key={s._id} className="rounded-2xl overflow-hidden shadow-sm"
+                                style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
+                                <div className="px-4 py-3.5 flex items-center gap-3 cursor-pointer"
+                                    onClick={() => setExpanded(isOpen ? null : s._id)}>
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                        style={{ backgroundColor: s.isActive ? 'rgba(193,68,14,0.1)' : 'rgba(44,24,16,0.06)' }}>
+                                        <span className="text-sm font-bold" style={{ color: s.isActive ? '#C1440E' : '#94a3b8' }}>
+                                            {s.name?.[0]?.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <p className="text-sm font-bold truncate" style={{ color: '#2C1810' }}>{s.name}</p>
+                                            {!s.isActive && (
+                                                <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: 'rgba(148,163,184,0.15)', color: '#94a3b8' }}>
+                                                    Inactive
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs truncate" style={{ color: '#2C1810', opacity: 0.4 }}>
+                                            {s.email}
+                                        </p>
+                                    </div>
+                                    {isOpen ? <ChevronUp size={14} color="#2C1810" opacity={0.4} /> : <ChevronDown size={14} color="#2C1810" opacity={0.4} />}
+                                </div>
+
+                                {isOpen && (
+                                    <div className="px-4 pb-4 border-t space-y-3" style={{ borderColor: 'rgba(193,68,14,0.06)' }}>
+                                        <div className="pt-3 space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <Mail size={12} color="#C1440E" opacity={0.6} />
+                                                <p className="text-xs" style={{ color: '#2C1810', opacity: 0.6 }}>{s.email}</p>
+                                            </div>
+                                            {s.phone && (
+                                                <div className="flex items-center gap-2">
+                                                    <Phone size={12} color="#C1440E" opacity={0.6} />
+                                                    <p className="text-xs" style={{ color: '#2C1810', opacity: 0.6 }}>{s.phone}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => openEdit(s)}
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
+                                                style={{ backgroundColor: 'rgba(193,68,14,0.08)', color: '#C1440E' }}>
+                                                <Edit2 size={12} /> Edit
+                                            </button>
+                                            <button onClick={() => toggleActive(s)}
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
+                                                style={{
+                                                    backgroundColor: s.isActive ? 'rgba(148,163,184,0.12)' : 'rgba(22,163,74,0.1)',
+                                                    color: s.isActive ? '#94a3b8' : '#16a34a',
+                                                }}>
+                                                {s.isActive ? <><UserX size={12} /> Deactivate</> : <><UserPlus size={12} /> Activate</>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            <Sheet open={showAdd || !!editSir} onClose={() => { setShowAdd(false); setEditSir(null); }}
+                title={editSir ? `Edit — ${editSir.name}` : 'Add New Sir'}>
+                <form onSubmit={handleSave} className="space-y-4">
+                    <Field label="Full Name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
+                    {!editSir && (
+                        <>
+                            <Field label="Email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} required />
+                            <Field label="Password" type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} required placeholder="Min 6 characters" />
+                        </>
+                    )}
+                    <Field label="Phone" type="tel" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="Mobile number" />
+
+                    {error && <p className="text-xs py-2 text-center rounded-xl" style={{ backgroundColor: '#FEF2F2', color: '#C1440E' }}>{error}</p>}
+                    <button type="submit" disabled={saving}
+                        className="w-full py-3 rounded-xl font-semibold text-sm"
+                        style={{ backgroundColor: '#C1440E', color: '#F5F0E8' }}>
+                        {saving ? 'Saving...' : editSir ? 'Save Changes' : 'Create Sir'}
+                    </button>
+                    {!editSir && (
+                        <p className="text-xs text-center" style={{ color: '#2C1810', opacity: 0.4 }}>
+                            Login credentials will be emailed to the new teacher
+                        </p>
+                    )}
+                </form>
+            </Sheet>
+        </div>
+    );
+}
+
 // ─── ROOT PAGE ────────────────────────────────────────────────────────────────
 export default function StudentList() {
     const [tab, setTab] = useState('students');
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [parents, setParents] = useState([]);
+    const [sirs, setSirs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchAll = async () => {
         try {
-            const [sRes, bRes, pRes] = await Promise.all([
+            const [sRes, bRes, pRes, sirRes] = await Promise.all([
                 api.get('/users/students'),
                 api.get('/users/batches'),
                 api.get('/users/parents'),
+                api.get('/users/sirs'),
             ]);
             setStudents(sRes.data.students || []);
             setBatches(bRes.data.batches || []);
             setParents(pRes.data.parents || []);
+            setSirs(sirRes.data.sirs || []);
         } catch (_) {}
     };
 
@@ -673,6 +851,7 @@ export default function StudentList() {
         { key: 'students', label: 'Students', count: students.length, Icon: Users },
         { key: 'batches', label: 'Batches', count: batches.length, Icon: BookOpen },
         { key: 'parents', label: 'Parents', count: parents.length, Icon: UserCheck },
+        { key: 'sirs', label: 'Sirs', count: sirs.length, Icon: UserPlus },
     ];
 
     return (
@@ -702,6 +881,7 @@ export default function StudentList() {
                 {tab === 'students' && <StudentsTab students={students} batches={batches} parents={parents} onRefresh={fetchAll} />}
                 {tab === 'batches' && <BatchesTab batches={batches} students={students} onRefresh={fetchAll} />}
                 {tab === 'parents' && <ParentsTab parents={parents} students={students} onRefresh={fetchAll} />}
+                {tab === 'sirs' && <SirsTab sirs={sirs} onRefresh={fetchAll} />}
             </div>
 
             <BottomNav />

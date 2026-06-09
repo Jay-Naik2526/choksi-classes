@@ -40,7 +40,7 @@ const uploadToDrive = async (file) => {
         fileId: response.data.id,
         webViewLink: response.data.webViewLink,
         webContentLink: response.data.webContentLink,
-        directUrl: `https://drive.google.com/uc?export=view&id=${response.data.id}`,
+        directUrl: `https://lh3.googleusercontent.com/d/${response.data.id}`,
         name: response.data.name,
     };
 };

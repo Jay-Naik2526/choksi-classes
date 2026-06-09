@@ -5,7 +5,7 @@ import PageHeader from '../../components/layout/PageHeader';
 import Spinner from '../../components/ui/Spinner';
 import { PageLoader } from '../../components/ui/Spinner';
 import useAuthStore from '../../store/authStore';
-import api from '../../utils/api';
+import api, { getDirectImageUrl } from '../../utils/api';
 
 export default function Profile() {
     const { logout } = useAuthStore();
@@ -131,7 +131,7 @@ export default function Profile() {
                         style={{ backgroundColor: '#C1440E', transform: 'translate(30%, -30%)' }} />
                     <div className="relative w-20 h-20 mx-auto mb-4">
                         {profile?.profilePhoto ? (
-                            <img src={profile.profilePhoto} alt={profile.name}
+                            <img src={getDirectImageUrl(profile.profilePhoto)} alt={profile.name}
                                 className="w-20 h-20 rounded-2xl object-cover" />
                         ) : (
                             <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-bold"

@@ -590,3 +590,60 @@ exports.getReferrals = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+// GET /api/users/sirs — Sir: list all sirs
+exports.getSirs = async (req, res) => {
+    try {
+        const sirs = await User.find({ role: 'sir' })
+            .select('-password -otp -otpExpiry')
+            .sort({ name: 1 });
+        res.json({ sirs });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// POST /api/users/sirs — Sir: create sir
+exports.createSir = async (req, res) => {
+    try {
+        const { name, email, password, phone } = req.body;
+        const exists = await User.findOne({ email });
+        if (exists) return res.status(400).json({ message: 'Email already registered' });
+
+        const sir = await User.create({
+            name, email, password, phone,
+            role: 'sir',
+        });
+
+        try {
+            await sendEmail({
+                to: email,
+                subject: 'Choksi Classes — Your admin account is ready',
+                html: welcomeEmail({ name, email, password, role: 'Sir/Teacher (Admin)' }),
+            });
+        } catch (_) {}
+
+        res.status(201).json({ message: 'Admin created', sir: { id: sir._id, name: sir.name, email: sir.email } });
+    } catch (err) {
+        if (err.code === 11000) return res.status(400).json({ message: 'Email already registered' });
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// PATCH /api/users/sirs/:id — Sir: update sir
+exports.updateSir = async (req, res) => {
+    try {
+        const { isActive, name, phone } = req.body;
+        const sir = await User.findById(req.params.id);
+        if (!sir || sir.role !== 'sir') return res.status(404).json({ message: 'Admin not found' });
+
+        if (name !== undefined) sir.name = name;
+        if (phone !== undefined) sir.phone = phone;
+        if (isActive !== undefined) sir.isActive = isActive;
+        await sir.save();
+
+        res.json({ message: 'Admin updated' });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};

@@ -6,7 +6,7 @@ import PageHeader from '../../components/layout/PageHeader';
 import Spinner from '../../components/ui/Spinner';
 import { PageLoader } from '../../components/ui/Spinner';
 import useAuthStore from '../../store/authStore';
-import api from '../../utils/api';
+import api, { getDirectImageUrl } from '../../utils/api';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -179,7 +179,7 @@ export default function DoubtDetail() {
                         {doubt.question}
                     </h3>
                     {doubt.questionImageUrl && (
-                        <img src={doubt.questionImageUrl} alt="question"
+                        <img src={getDirectImageUrl(doubt.questionImageUrl)} alt="question"
                             className="w-full rounded-xl object-cover max-h-64 mt-2" />
                     )}
                 </div>
@@ -206,7 +206,7 @@ export default function DoubtDetail() {
                         </div>
                         <p className="text-sm leading-relaxed" style={{ color: '#2C1810' }}>{doubt.answer}</p>
                         {doubt.answerImageUrl && (
-                            <img src={doubt.answerImageUrl} alt="answer"
+                            <img src={getDirectImageUrl(doubt.answerImageUrl)} alt="answer"
                                 className="w-full rounded-xl object-cover max-h-64 mt-3" />
                         )}
                     </div>

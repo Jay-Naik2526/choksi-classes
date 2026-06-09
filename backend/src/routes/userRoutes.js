@@ -16,6 +16,11 @@ router.post('/students', protect, authorize('sir'), ctrl.createStudent);
 router.patch('/students/:id', protect, authorize('sir'), ctrl.updateStudent);
 router.get('/students/:id/progress-report', protect, authorize('sir'), ctrl.generateProgressReport);
 
+// Sirs/Admins
+router.get('/sirs', protect, authorize('sir'), ctrl.getSirs);
+router.post('/sirs', protect, authorize('sir'), ctrl.createSir);
+router.patch('/sirs/:id', protect, authorize('sir'), ctrl.updateSir);
+
 // Batches
 router.get('/batches', protect, ctrl.getBatches);
 router.post('/batches', protect, authorize('sir'), ctrl.createBatch);
