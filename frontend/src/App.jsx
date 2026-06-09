@@ -1,31 +1,34 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import useAuthStore from './store/authStore';
-import Landing from './pages/Landing';
-import Admissions from './pages/Admissions';
-import Login from './pages/auth/Login';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import ResetPassword from './pages/auth/ResetPassword';
-import Dashboard from './pages/dashboard/Dashboard';
-import NoticeList from './pages/notices/NoticeList';
-import CreateNotice from './pages/notices/CreateNotice';
-import MaterialList from './pages/materials/MaterialList';
-import UploadMaterial from './pages/materials/UploadMaterial';
-import FeeList from './pages/fees/FeeList';
-import DoubtList from './pages/doubts/DoubtList';
-import SubmitDoubt from './pages/doubts/SubmitDoubt';
-import DoubtDetail from './pages/doubts/DoubtDetail';
-import TestList from './pages/tests/TestList';
-import CreateTest from './pages/tests/CreateTest';
-import AttemptTest from './pages/tests/AttemptTest';
-import TestResult from './pages/tests/TestResult';
-import QuestionBank from './pages/tests/QuestionBank';
-import Profile from './pages/profile/Profile';
-import StudentList from './pages/students/StudentList';
-import HomeworkList from './pages/homework/HomeworkList';
-import CreateHomework from './pages/homework/CreateHomework';
-import HomeworkDetail from './pages/homework/HomeworkDetail';
-import BatchManagement from './pages/batches/BatchManagement';
-import ReferralTracker from './pages/students/ReferralTracker';
+import { PageLoader } from './components/ui/Spinner';
+
+const Landing = lazy(() => import('./pages/Landing'));
+const Admissions = lazy(() => import('./pages/Admissions'));
+const Login = lazy(() => import('./pages/auth/Login'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+const Dashboard = lazy(() => import('./pages/dashboard/Dashboard'));
+const NoticeList = lazy(() => import('./pages/notices/NoticeList'));
+const CreateNotice = lazy(() => import('./pages/notices/CreateNotice'));
+const MaterialList = lazy(() => import('./pages/materials/MaterialList'));
+const UploadMaterial = lazy(() => import('./pages/materials/UploadMaterial'));
+const FeeList = lazy(() => import('./pages/fees/FeeList'));
+const DoubtList = lazy(() => import('./pages/doubts/DoubtList'));
+const SubmitDoubt = lazy(() => import('./pages/doubts/SubmitDoubt'));
+const DoubtDetail = lazy(() => import('./pages/doubts/DoubtDetail'));
+const TestList = lazy(() => import('./pages/tests/TestList'));
+const CreateTest = lazy(() => import('./pages/tests/CreateTest'));
+const AttemptTest = lazy(() => import('./pages/tests/AttemptTest'));
+const TestResult = lazy(() => import('./pages/tests/TestResult'));
+const QuestionBank = lazy(() => import('./pages/tests/QuestionBank'));
+const Profile = lazy(() => import('./pages/profile/Profile'));
+const StudentList = lazy(() => import('./pages/students/StudentList'));
+const HomeworkList = lazy(() => import('./pages/homework/HomeworkList'));
+const CreateHomework = lazy(() => import('./pages/homework/CreateHomework'));
+const HomeworkDetail = lazy(() => import('./pages/homework/HomeworkDetail'));
+const BatchManagement = lazy(() => import('./pages/batches/BatchManagement'));
+const ReferralTracker = lazy(() => import('./pages/students/ReferralTracker'));
 
 const PrivateRoute = ({ children }) => {
     const { token } = useAuthStore();
@@ -40,50 +43,52 @@ const PublicRoute = ({ children }) => {
 function App() {
     return (
         <BrowserRouter>
-            <Routes>
-                <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-                <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-                <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+            <Suspense fallback={<PageLoader />}>
+                <Routes>
+                    <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+                    <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+                    <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
-                <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                    <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
 
-                <Route path="/notices" element={<PrivateRoute><NoticeList /></PrivateRoute>} />
-                <Route path="/notices/create" element={<PrivateRoute><CreateNotice /></PrivateRoute>} />
+                    <Route path="/notices" element={<PrivateRoute><NoticeList /></PrivateRoute>} />
+                    <Route path="/notices/create" element={<PrivateRoute><CreateNotice /></PrivateRoute>} />
 
-                <Route path="/materials" element={<PrivateRoute><MaterialList /></PrivateRoute>} />
-                <Route path="/materials/upload" element={<PrivateRoute><UploadMaterial /></PrivateRoute>} />
+                    <Route path="/materials" element={<PrivateRoute><MaterialList /></PrivateRoute>} />
+                    <Route path="/materials/upload" element={<PrivateRoute><UploadMaterial /></PrivateRoute>} />
 
-                <Route path="/fees" element={<PrivateRoute><FeeList /></PrivateRoute>} />
+                    <Route path="/fees" element={<PrivateRoute><FeeList /></PrivateRoute>} />
 
-                <Route path="/doubts" element={<PrivateRoute><DoubtList /></PrivateRoute>} />
-                <Route path="/doubts/submit" element={<PrivateRoute><SubmitDoubt /></PrivateRoute>} />
-                <Route path="/doubts/:id" element={<PrivateRoute><DoubtDetail /></PrivateRoute>} />
+                    <Route path="/doubts" element={<PrivateRoute><DoubtList /></PrivateRoute>} />
+                    <Route path="/doubts/submit" element={<PrivateRoute><SubmitDoubt /></PrivateRoute>} />
+                    <Route path="/doubts/:id" element={<PrivateRoute><DoubtDetail /></PrivateRoute>} />
 
-                <Route path="/tests" element={<PrivateRoute><TestList /></PrivateRoute>} />
-                <Route path="/tests/create" element={<PrivateRoute><CreateTest /></PrivateRoute>} />
-                <Route path="/tests/question-bank" element={<PrivateRoute><QuestionBank /></PrivateRoute>} />
-                <Route path="/tests/:id/attempt" element={<PrivateRoute><AttemptTest /></PrivateRoute>} />
-                <Route path="/tests/:id/result" element={<PrivateRoute><TestResult /></PrivateRoute>} />
+                    <Route path="/tests" element={<PrivateRoute><TestList /></PrivateRoute>} />
+                    <Route path="/tests/create" element={<PrivateRoute><CreateTest /></PrivateRoute>} />
+                    <Route path="/tests/question-bank" element={<PrivateRoute><QuestionBank /></PrivateRoute>} />
+                    <Route path="/tests/:id/attempt" element={<PrivateRoute><AttemptTest /></PrivateRoute>} />
+                    <Route path="/tests/:id/result" element={<PrivateRoute><TestResult /></PrivateRoute>} />
 
-                <Route path="/students" element={<PrivateRoute><StudentList /></PrivateRoute>} />
-                <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                    <Route path="/students" element={<PrivateRoute><StudentList /></PrivateRoute>} />
+                    <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
 
-                {/* Homework */}
-                <Route path="/homework" element={<PrivateRoute><HomeworkList /></PrivateRoute>} />
-                <Route path="/homework/create" element={<PrivateRoute><CreateHomework /></PrivateRoute>} />
-                <Route path="/homework/:id" element={<PrivateRoute><HomeworkDetail /></PrivateRoute>} />
+                    {/* Homework */}
+                    <Route path="/homework" element={<PrivateRoute><HomeworkList /></PrivateRoute>} />
+                    <Route path="/homework/create" element={<PrivateRoute><CreateHomework /></PrivateRoute>} />
+                    <Route path="/homework/:id" element={<PrivateRoute><HomeworkDetail /></PrivateRoute>} />
 
-                {/* Batches */}
-                <Route path="/batches" element={<PrivateRoute><BatchManagement /></PrivateRoute>} />
+                    {/* Batches */}
+                    <Route path="/batches" element={<PrivateRoute><BatchManagement /></PrivateRoute>} />
 
-                {/* Referrals */}
-                <Route path="/referrals" element={<PrivateRoute><ReferralTracker /></PrivateRoute>} />
+                    {/* Referrals */}
+                    <Route path="/referrals" element={<PrivateRoute><ReferralTracker /></PrivateRoute>} />
 
-                {/* Public */}
-                <Route path="/admissions" element={<Admissions />} />
-                <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+                    {/* Public */}
+                    <Route path="/admissions" element={<Admissions />} />
+                    <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+            </Suspense>
         </BrowserRouter>
     );
 }
