@@ -66,7 +66,8 @@ export default function BatchManagement() {
     return (
         <div style={{ minHeight:'100vh', backgroundColor:'#F7F4EF', paddingBottom:80 }}>
             <PageHeader title="Batch Management" subtitle={`${batches.length} batches`}
-                action={{ label:'New Batch', icon: Plus, onClick:() => setShowForm(p => !p) }}/>
+                action={{ label:'New Batch', icon: Plus, onClick:() => setShowForm(p => !p) }}
+                backTo="/dashboard" />
 
             <div style={{ padding:'16px 20px', maxWidth:800, margin:'0 auto' }}>
                 {msg && <div style={{ padding:'10px 14px', borderRadius:10, backgroundColor:'rgba(22,163,74,0.08)', color:'#16a34a', fontSize:13, fontWeight:600, marginBottom:12, border:'1px solid rgba(22,163,74,0.2)' }}>{msg}</div>}

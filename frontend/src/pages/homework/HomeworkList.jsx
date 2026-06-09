@@ -5,6 +5,7 @@ import api from '../../utils/api';
 import useAuthStore from '../../store/authStore';
 import PageHeader from '../../components/layout/PageHeader';
 import { PageLoader } from '../../components/ui/Spinner';
+import BottomNav from '../../components/layout/BottomNav';
 
 function statusInfo(hw, mySubmission, role) {
     const now = new Date();
@@ -101,6 +102,7 @@ export default function HomeworkList() {
                     );
                 })}
             </div>
+            <BottomNav />
         </div>
     );
 }

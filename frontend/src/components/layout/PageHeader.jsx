@@ -40,7 +40,22 @@ export default function PageHeader({ title, subtitle, action, backTo }) {
                     )}
                 </div>
             </div>
-            {action && <div>{action}</div>}
+            {action && (
+                <div>
+                    {action.onClick ? (
+                        <button
+                            onClick={action.onClick}
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 hover:opacity-90"
+                            style={{ backgroundColor: '#C1440E', color: '#F5F0E8' }}
+                        >
+                            {action.icon && <action.icon size={14} />}
+                            {action.label}
+                        </button>
+                    ) : (
+                        action
+                    )}
+                </div>
+            )}
         </div>
     );
 }
