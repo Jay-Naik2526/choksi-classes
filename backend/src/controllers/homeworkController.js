@@ -54,7 +54,11 @@ exports.create = async (req, res) => {
     try {
         const { title, description, dueDate, batchId, subject } = req.body;
         const hw = await Homework.create({
-            title, description, dueDate, batchId, subject,
+            title,
+            description,
+            dueDate,
+            batchId: batchId || undefined,
+            subject,
             createdBy: req.user._id,
         });
 
