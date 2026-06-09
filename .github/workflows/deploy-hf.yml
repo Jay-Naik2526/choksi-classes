@@ -37,7 +37,7 @@ jobs:
 
           # Add the Hugging Face Spaces remote
           # Using '.' as username is the official way to authenticate with token on Hugging Face Spaces
-          git remote add origin https://.:$HF_TOKEN@huggingface.co/spaces/Jay-Naik2526/choksi-classes
+          git remote add origin https://.:$HF_TOKEN@huggingface.co/spaces/Jaynaik2526/choksi-classes
 
           # Set branch to main, stage all files, and force push
           git checkout -b main
