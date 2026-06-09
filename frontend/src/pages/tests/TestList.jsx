@@ -14,14 +14,39 @@ export default function TestList() {
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
+    const [children, setChildren] = useState([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
+
+    // Fetch children if parent
+    useEffect(() => {
+        if (user?.role === 'parent') {
+            api.get('/users/my-children')
+                .then(r => {
+                    const kids = r.data.children || [];
+                    setChildren(kids);
+                    if (kids.length > 0) {
+                        setSelectedStudentId(kids[0]._id);
+                    } else {
+                        setLoading(false);
+                    }
+                })
+                .catch(() => setLoading(false));
+        }
+    }, [user]);
 
     useEffect(() => {
-        const params = filter !== 'all' ? `?status=${filter}` : '';
+        if (user?.role === 'parent' && !selectedStudentId) return;
+
+        let params = filter !== 'all' ? `?status=${filter}` : '';
+        if (user?.role === 'parent' && selectedStudentId) {
+            params += (params ? '&' : '?') + `studentId=${selectedStudentId}`;
+        }
+
         api.get(`/tests${params}`)
             .then(r => setTests(r.data.tests || []))
             .catch(() => {})
             .finally(() => setLoading(false));
-    }, [filter]);
+    }, [filter, selectedStudentId, user]);
 
     const handlePublish = async (id, current) => {
         const status = current === 'draft' ? 'published' : 'draft';
@@ -38,6 +63,8 @@ export default function TestList() {
 
     const isSir = user?.role === 'sir';
     const isStudent = user?.role === 'student';
+    const isParent = user?.role === 'parent';
+    const showScore = isStudent || isParent;
 
     const filters = isSir
         ? ['all', 'draft', 'published', 'completed', 'results_released']
@@ -63,6 +90,24 @@ export default function TestList() {
                     </div>
                 )}
             />
+
+            {/* Child selector if parent */}
+            {isParent && children.length > 0 && (
+                <div className="px-6 mb-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                    {children.map((kid) => (
+                        <button key={kid._id}
+                            onClick={() => { setSelectedStudentId(kid._id); setLoading(true); }}
+                            className="px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
+                            style={{
+                                backgroundColor: selectedStudentId === kid._id ? '#2C1810' : '#FFFFFF',
+                                color: selectedStudentId === kid._id ? '#F5F0E8' : 'rgba(44,24,16,0.6)',
+                                border: `1px solid ${selectedStudentId === kid._id ? '#2C1810' : 'rgba(44,24,16,0.12)'}`,
+                            }}>
+                            {kid.name.split(' ')[0]}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="px-6 mb-4 flex gap-2 overflow-x-auto pb-1">
                 {filters.map((f) => (
@@ -133,7 +178,7 @@ export default function TestList() {
                             </div>
 
                             {/* Student score if attempted */}
-                            {isStudent && attempt && (
+                            {showScore && attempt && (
                                 <div className="flex items-center gap-2 p-3 rounded-xl mb-3"
                                     style={{ backgroundColor: attempt.percentage >= 75 ? 'rgba(22,163,74,0.08)' : attempt.percentage >= 50 ? 'rgba(232,160,32,0.08)' : 'rgba(193,68,14,0.08)' }}>
                                     <Award size={15} color={attempt.percentage >= 75 ? '#16a34a' : attempt.percentage >= 50 ? '#E8A020' : '#C1440E'} />
@@ -177,14 +222,14 @@ export default function TestList() {
                                         <Play size={14} fill="#F5F0E8" /> Attempt Test
                                     </button>
                                 )}
-                                {isStudent && attempt?.status === 'submitted' && test.status !== 'results_released' && (
+                                {showScore && attempt?.status === 'submitted' && test.status !== 'results_released' && (
                                     <div className="flex-1 py-2.5 rounded-xl text-sm text-center"
                                         style={{ backgroundColor: '#F7F4EF', color: '#2C1810', opacity: 0.7 }}>
                                         Awaiting results
                                     </div>
                                 )}
-                                {isStudent && test.status === 'results_released' && attempt && (
-                                    <button onClick={() => navigate(`/tests/${test._id}/result`)}
+                                {showScore && test.status === 'results_released' && attempt && (
+                                    <button onClick={() => navigate(`/tests/${test._id}/result${isParent ? `?studentId=${selectedStudentId}` : ''}`)}
                                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
                                         style={{ backgroundColor: '#2C1810', color: '#F5F0E8' }}>
                                         <Award size={14} /> View Result

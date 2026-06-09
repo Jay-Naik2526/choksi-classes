@@ -14,7 +14,7 @@ router.get('/my-children', protect, authorize('parent'), ctrl.getMyChildren);
 router.get('/students', protect, authorize('sir'), ctrl.getStudents);
 router.post('/students', protect, authorize('sir'), ctrl.createStudent);
 router.patch('/students/:id', protect, authorize('sir'), ctrl.updateStudent);
-router.get('/students/:id/progress-report', protect, authorize('sir'), ctrl.generateProgressReport);
+router.get('/students/:id/progress-report', protect, authorize('sir', 'parent', 'student'), ctrl.generateProgressReport);
 
 // Sirs/Admins
 router.get('/sirs', protect, authorize('sir'), ctrl.getSirs);

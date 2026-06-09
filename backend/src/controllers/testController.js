@@ -12,14 +12,32 @@ exports.getTests = async (req, res) => {
 
         if (role === 'sir') {
             if (status) filter.status = status;
+        } else if (role === 'parent') {
+            const studentId = req.query.studentId;
+            if (!studentId) {
+                return res.status(400).json({ message: 'studentId query parameter required' });
+            }
+            const parent = await User.findById(_id);
+            const isChild = parent.childIds?.some(cid => cid.toString() === studentId);
+            if (!isChild) {
+                return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
+            }
+
+            filter.status = { $in: ['published', 'active', 'completed', 'results_released'] };
+            const studentDoc = await User.findById(studentId).select('batchIds');
+            filter.$or = [
+                { batchId: { $exists: false } },
+                { batchId: null },
+                { batchId: { $in: studentDoc?.batchIds || [] } },
+            ];
         } else {
             filter.status = { $in: ['published', 'active', 'completed', 'results_released'] };
-        const studentDoc = await User.findById(_id).select('batchIds');
-        filter.$or = [
-            { batchId: { $exists: false } },
-            { batchId: null },
-            { batchId: { $in: studentDoc?.batchIds || [] } },
-        ];
+            const studentDoc = await User.findById(_id).select('batchIds');
+            filter.$or = [
+                { batchId: { $exists: false } },
+                { batchId: null },
+                { batchId: { $in: studentDoc?.batchIds || [] } },
+            ];
         }
 
         if (upcoming === 'true') filter.date = { $gte: new Date() };
@@ -29,8 +47,9 @@ exports.getTests = async (req, res) => {
             .populate('batchId', 'name subject')
             .populate('createdBy', 'name');
 
-        if (role === 'student') {
-            const attempts = await Attempt.find({ studentId: _id }).select('testId status score percentage');
+        if (role === 'student' || role === 'parent') {
+            const targetStudentId = role === 'parent' ? req.query.studentId : _id;
+            const attempts = await Attempt.find({ studentId: targetStudentId }).select('testId status score percentage');
             const attemptMap = {};
             attempts.forEach(a => { attemptMap[a.testId.toString()] = a; });
             const testsWithAttempt = tests.map(t => ({
@@ -218,6 +237,26 @@ exports.getResults = async (req, res) => {
             if (test.status !== 'results_released')
                 return res.status(400).json({ message: 'Results not yet released' });
             const attempt = await Attempt.findOne({ studentId: req.user._id, testId: test._id })
+                .populate({ path: 'answers.questionId', select: 'text options correctAnswer marks type' });
+            if (!attempt) return res.status(404).json({ message: 'No attempt found' });
+            return res.json({ attempt, test });
+        }
+
+        if (req.user.role === 'parent') {
+            const studentId = req.query.studentId;
+            if (!studentId) {
+                return res.status(400).json({ message: 'studentId query parameter required' });
+            }
+            const parent = await User.findById(req.user._id);
+            const isChild = parent.childIds?.some(cid => cid.toString() === studentId);
+            if (!isChild) {
+                return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
+            }
+
+            if (test.status !== 'results_released')
+                return res.status(400).json({ message: 'Results not yet released' });
+
+            const attempt = await Attempt.findOne({ studentId, testId: test._id })
                 .populate({ path: 'answers.questionId', select: 'text options correctAnswer marks type' });
             if (!attempt) return res.status(404).json({ message: 'No attempt found' });
             return res.json({ attempt, test });

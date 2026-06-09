@@ -588,7 +588,11 @@ export default function TestResult() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get(`/tests/${id}/results`)
+        const queryParams = new URLSearchParams(window.location.search);
+        const studentId = queryParams.get('studentId');
+        const params = studentId ? `?studentId=${studentId}` : '';
+
+        api.get(`/tests/${id}/results${params}`)
             .then(r => setData(r.data))
             .catch(() => navigate('/tests'))
             .finally(() => setLoading(false));

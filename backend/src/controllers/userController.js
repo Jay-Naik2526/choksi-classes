@@ -347,6 +347,19 @@ exports.generateProgressReport = async (req, res) => {
         if (!student || student.role !== 'student')
             return res.status(404).json({ message: 'Student not found' });
 
+        // Security check
+        const { role, _id } = req.user;
+        if (role === 'student' && String(_id) !== String(student._id)) {
+            return res.status(403).json({ message: 'Access denied: You can only generate your own report' });
+        }
+        if (role === 'parent') {
+            const parent = await User.findById(_id);
+            const isChild = parent.childIds?.some(cid => String(cid) === String(student._id));
+            if (!isChild) {
+                return res.status(403).json({ message: 'Access denied: Student is not linked to this parent' });
+            }
+        }
+
         const [attempts, fees, doubts] = await Promise.all([
             Attempt.find({ studentId: student._id, status: { $in: ['submitted', 'graded'] } })
                 .sort({ submittedAt: -1 }).limit(8),
