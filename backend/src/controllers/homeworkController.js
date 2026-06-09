@@ -11,7 +11,11 @@ exports.list = async (req, res) => {
         let query = { isActive: true };
 
         if (role === 'student') {
-            query.batchId = { $in: batchIds || [] };
+            query.$or = [
+                { batchId: { $in: batchIds || [] } },
+                { batchId: null },
+                { batchId: { $exists: false } }
+            ];
         }
 
         const homeworks = await Homework.find(query)
