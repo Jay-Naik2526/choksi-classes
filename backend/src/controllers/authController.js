@@ -4,7 +4,7 @@ const sendEmail = require('../utils/sendEmail');
 const generateOTP = require('../utils/generateOTP');
 
 const signToken = (id) =>
-    jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
+    jwt.sign({ id }, process.env.JWT_SECRET);
 
 // @POST /api/auth/login
 exports.login = async (req, res) => {
