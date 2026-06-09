@@ -4,14 +4,25 @@ const Notice = require('../models/Notice');
 exports.getNotices = async (req, res) => {
     try {
         const { role } = req.user;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+
         const filter = { isActive: true };
         if (role !== 'sir') {
             filter.$or = [{ targetRole: 'all' }, { targetRole: role }];
         }
+        const total = await Notice.countDocuments(filter);
         const notices = await Notice.find(filter)
             .sort({ createdAt: -1 })
-            .populate('createdBy', 'name');
-        res.json({ notices });
+            .skip(skip)
+            .limit(limit)
+            .populate('createdBy', 'name')
+            .lean();
+        res.json({
+            notices,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -60,6 +71,22 @@ exports.deleteNotice = async (req, res) => {
         notice.isActive = false;
         await notice.save();
         res.json({ message: 'Notice deleted' });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// POST /api/notices/:id/read
+exports.markRead = async (req, res) => {
+    try {
+        const notice = await Notice.findById(req.params.id);
+        if (!notice) return res.status(404).json({ message: 'Notice not found' });
+
+        if (!notice.readBy.includes(req.user._id)) {
+            notice.readBy.push(req.user._id);
+            await notice.save();
+        }
+        res.json({ message: 'Notice marked as read', readBy: notice.readBy });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }

@@ -8,6 +8,9 @@ exports.getTests = async (req, res) => {
     try {
         const { role, _id } = req.user;
         const { status, upcoming } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
         const filter = {};
 
         if (role === 'sir') {
@@ -17,14 +20,14 @@ exports.getTests = async (req, res) => {
             if (!studentId) {
                 return res.status(400).json({ message: 'studentId query parameter required' });
             }
-            const parent = await User.findById(_id);
+            const parent = await User.findById(_id).lean();
             const isChild = parent.childIds?.some(cid => cid.toString() === studentId);
             if (!isChild) {
                 return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
             }
 
             filter.status = { $in: ['published', 'active', 'completed', 'results_released'] };
-            const studentDoc = await User.findById(studentId).select('batchIds');
+            const studentDoc = await User.findById(studentId).select('batchIds').lean();
             filter.$or = [
                 { batchId: { $exists: false } },
                 { batchId: null },
@@ -32,7 +35,7 @@ exports.getTests = async (req, res) => {
             ];
         } else {
             filter.status = { $in: ['published', 'active', 'completed', 'results_released'] };
-            const studentDoc = await User.findById(_id).select('batchIds');
+            const studentDoc = await User.findById(_id).select('batchIds').lean();
             filter.$or = [
                 { batchId: { $exists: false } },
                 { batchId: null },
@@ -42,24 +45,34 @@ exports.getTests = async (req, res) => {
 
         if (upcoming === 'true') filter.date = { $gte: new Date() };
 
+        const total = await Test.countDocuments(filter);
         const tests = await Test.find(filter)
             .sort({ date: 1 })
+            .skip(skip)
+            .limit(limit)
             .populate('batchId', 'name subject')
-            .populate('createdBy', 'name');
+            .populate('createdBy', 'name')
+            .lean();
 
         if (role === 'student' || role === 'parent') {
             const targetStudentId = role === 'parent' ? req.query.studentId : _id;
-            const attempts = await Attempt.find({ studentId: targetStudentId }).select('testId status score percentage');
+            const attempts = await Attempt.find({ studentId: targetStudentId }).select('testId status score percentage').lean();
             const attemptMap = {};
             attempts.forEach(a => { attemptMap[a.testId.toString()] = a; });
             const testsWithAttempt = tests.map(t => ({
-                ...t.toObject(),
+                ...t,
                 attempt: attemptMap[t._id.toString()] || null,
             }));
-            return res.json({ tests: testsWithAttempt });
+            return res.json({
+                tests: testsWithAttempt,
+                pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+            });
         }
 
-        res.json({ tests });
+        res.json({
+            tests,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }

@@ -32,10 +32,20 @@ export default function NoticeList() {
 
     useEffect(() => {
         api.get('/notices')
-            .then(r => setNotices(r.data.notices || []))
+            .then(r => {
+                const fetched = r.data.notices || [];
+                setNotices(fetched);
+                if (user && user.role !== 'sir') {
+                    fetched.forEach(n => {
+                        if (!n.readBy?.includes(user.id)) {
+                            api.post(`/notices/${n._id}/read`).catch(() => {});
+                        }
+                    });
+                }
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
-    }, []);
+    }, [user]);
 
     const handleDelete = async (id) => {
         if (!confirm('Delete this notice?')) return;
@@ -113,9 +123,12 @@ export default function NoticeList() {
                                             </span>
                                         )}
                                     </div>
-                                    <h3 className="text-base font-bold mb-2"
+                                    <h3 className="text-base font-bold mb-2 flex items-center gap-2"
                                         style={{ fontFamily: 'Playfair Display, serif', color: '#2C1810' }}>
                                         {n.title}
+                                        {user?.role !== 'sir' && !n.readBy?.includes(user?.id) && (
+                                            <span className="w-2.5 h-2.5 rounded-full bg-orange-600 animate-pulse flex-shrink-0" title="Unread Notice" />
+                                        )}
                                     </h3>
                                     <p className="text-sm leading-relaxed" style={{ color: '#2C1810', opacity: 0.7 }}>
                                         {n.body}

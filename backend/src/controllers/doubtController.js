@@ -8,22 +8,32 @@ exports.getDoubts = async (req, res) => {
     try {
         const { role, _id } = req.user;
         const { status, subject } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
         const filter = {};
 
         if (role === 'student') filter.studentId = _id;
         else if (role === 'parent') {
-            const parent = await User.findById(_id);
-            filter.studentId = { $in: parent.childIds };
+            const parent = await User.findById(_id).lean();
+            filter.studentId = { $in: parent?.childIds || [] };
         }
         if (status) filter.status = status;
         if (subject) filter.subject = subject;
 
+        const total = await Doubt.countDocuments(filter);
         const doubts = await Doubt.find(filter)
             .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
             .populate('studentId', 'name')
-            .populate('answeredBy', 'name');
+            .populate('answeredBy', 'name')
+            .lean();
 
-        res.json({ doubts });
+        res.json({
+            doubts,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }

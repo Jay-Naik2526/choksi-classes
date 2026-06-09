@@ -17,10 +17,10 @@ const homeworkSchema = new mongoose.Schema({
     description: { type: String, default: '' },
     subject:     { type: String, default: '' },
     dueDate:     { type: Date, required: true },
-    batchId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Batch' },
+    batchId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', index: true },
     createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     submissions: [submissionSchema],
-    isActive:    { type: Boolean, default: true },
+    isActive:    { type: Boolean, default: true, index: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Homework', homeworkSchema);

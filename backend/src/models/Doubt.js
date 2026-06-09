@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const doubtSchema = new mongoose.Schema({
-    studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     subject: { type: String, required: true },
     chapter: { type: String },
     question: { type: String, required: true },
@@ -10,7 +10,7 @@ const doubtSchema = new mongoose.Schema({
     answer: { type: String },
     answerImageUrl: { type: String },
     answerImageId: { type: String },
-    status: { type: String, enum: ['pending', 'answered'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'answered'], default: 'pending', index: true },
     answeredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     answeredAt: { type: Date },
     messages: [{
@@ -23,3 +23,4 @@ const doubtSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Doubt', doubtSchema);
+

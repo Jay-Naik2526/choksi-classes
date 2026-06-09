@@ -360,15 +360,13 @@ exports.generateProgressReport = async (req, res) => {
             }
         }
 
-        const [attempts, fees, doubts] = await Promise.all([
+                const [attempts, fees, doubts] = await Promise.all([
             Attempt.find({ studentId: student._id, status: { $in: ['submitted', 'graded'] } })
+                .populate('testId', 'name subject totalMarks')
                 .sort({ submittedAt: -1 }).limit(8),
             Fee.find({ studentId: student._id }).sort({ year: -1, month: -1 }).limit(6),
             Doubt.countDocuments({ studentId: student._id }),
         ]);
-        const testDetails = await Promise.all(
-            attempts.map(a => Test.findById(a.testId).select('name subject totalMarks'))
-        );
 
         const avgScore = attempts.length
             ? Math.round(attempts.reduce((s, a) => s + (a.percentage || 0), 0) / attempts.length) : 0;
@@ -484,7 +482,7 @@ exports.generateProgressReport = async (req, res) => {
 
             let rowY = hdrY + 18;
             attempts.slice(0, 8).forEach((att, idx) => {
-                const t = testDetails[idx];
+                const t = att.testId;
                 const bg = idx % 2 === 0 ? '#FFFFFF' : CHALK;
                 const dateStr = att.submittedAt
                     ? new Date(att.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })

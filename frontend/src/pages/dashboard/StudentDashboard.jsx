@@ -319,10 +319,17 @@ export default function StudentDashboard() {
                     <div className="rounded-2xl overflow-hidden"
                         style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
                         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-                            <p className="text-sm font-bold"
-                                style={{ fontFamily: 'Playfair Display, serif', color: '#2C1810' }}>
-                                Notices
-                            </p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold"
+                                    style={{ fontFamily: 'Playfair Display, serif', color: '#2C1810' }}>
+                                    Notices
+                                </p>
+                                {notices.filter(n => !n.readBy?.includes(user?.id)).length > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white bg-orange-600 animate-pulse">
+                                        {notices.filter(n => !n.readBy?.includes(user?.id)).length} new
+                                    </span>
+                                )}
+                            </div>
                             <button onClick={() => navigate('/notices')}
                                 className="flex items-center gap-0.5"
                                 style={{ fontSize: '10px', fontWeight: 600, color: '#C1440E' }}>
@@ -341,7 +348,12 @@ export default function StudentDashboard() {
                                                 n.priority === 'holiday' ? '#E8A020' : 'rgba(44,24,16,0.35)',
                                         }} />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold truncate" style={{ color: '#2C1810' }}>{n.title}</p>
+                                        <p className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: '#2C1810' }}>
+                                            {n.title}
+                                            {!n.readBy?.includes(user?.id) && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse flex-shrink-0" />
+                                            )}
+                                        </p>
                                         <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'rgba(44,24,16,0.5)' }}>{n.body}</p>
                                     </div>
                                     <ChevronRight size={13} color="rgba(44,24,16,0.2)" className="flex-shrink-0 mt-0.5" />

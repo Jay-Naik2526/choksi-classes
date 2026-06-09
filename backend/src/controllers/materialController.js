@@ -6,22 +6,34 @@ const { uploadToDrive, deleteFromDrive } = require('../utils/driveUpload');
 exports.getMaterials = async (req, res) => {
     try {
         const { subject, chapter, type, search } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+
         const filter = { isActive: true };
         if (subject) filter.subject = subject;
         if (chapter) filter.chapter = new RegExp(chapter, 'i');
         if (type) filter.type = type;
         if (search) filter.title = new RegExp(search, 'i');
 
+        const total = await Material.countDocuments(filter);
         const materials = await Material.find(filter)
             .sort({ createdAt: -1 })
-            .populate('uploadedBy', 'name');
-        const user = await User.findById(req.user._id).select('bookmarkedMaterials');
-        const bookmarkSet = new Set(user.bookmarkedMaterials.map(b => b.toString()));
+            .skip(skip)
+            .limit(limit)
+            .populate('uploadedBy', 'name')
+            .lean();
+
+        const user = await User.findById(req.user._id).select('bookmarkedMaterials').lean();
+        const bookmarkSet = new Set((user?.bookmarkedMaterials || []).map(b => b.toString()));
         const materialsWithBookmark = materials.map(m => ({
-            ...m.toObject(),
+            ...m,
             isBookmarked: bookmarkSet.has(m._id.toString()),
         }));
-        res.json({ materials: materialsWithBookmark });
+        res.json({
+            materials: materialsWithBookmark,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }

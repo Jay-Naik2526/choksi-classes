@@ -56,6 +56,27 @@ app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// ── MongoDB Injection Sanitizer ──────────────────────────────────────────────
+const sanitizeQuery = (obj) => {
+    if (obj instanceof Object) {
+        for (const k in obj) {
+            if (k.startsWith('$') || k.includes('.')) {
+                delete obj[k];
+            } else {
+                sanitizeQuery(obj[k]);
+            }
+        }
+    }
+    return obj;
+};
+
+app.use((req, res, next) => {
+    req.body = sanitizeQuery(req.body);
+    req.query = sanitizeQuery(req.query);
+    req.params = sanitizeQuery(req.params);
+    next();
+});
+
 // ── Rate limiting ────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 min
