@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2C1810" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Choksi Classes" />
+    <meta name="description" content="Choksi Classes — Best coaching institute in Navsari, Gujarat. CBSE &amp; GSEB Std 1-12, Commerce stream. Daily tests, 20+ years experience. Call 8238216622." />
+    <meta name="keywords" content="Choksi Classes, tuition Navsari, coaching Navsari, CBSE coaching Navsari, GSEB coaching, commerce tuition, Dip Choksi, Kairavi Choksi" />
+    <meta property="og:title" content="Choksi Classes — Best Coaching in Navsari" />
+    <meta property="og:description" content="CBSE &amp; GSEB coaching for Std 1–12. Commerce stream Std 11–12. Daily tests, small batches, 20+ years experience. Navsari, Gujarat." />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_IN" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "EducationalOrganization",
+      "name": "Choksi Classes",
+      "description": "CBSE and GSEB coaching for Std 1-12, Commerce stream for Std 11-12. 20+ years experience, daily tests, small batches.",
+      "url": "https://choksiclasses.in",
+      "telephone": "+918238216622",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "304/5/6/7, Union Heights, Ashanagar",
+        "addressLocality": "Navsari",
+        "addressRegion": "Gujarat",
+        "postalCode": "396445",
+        "addressCountry": "IN"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 20.9467,
+        "longitude": 72.9327
+      },
+      "openingHours": "Mo-Su 00:00-24:00",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.7",
+        "reviewCount": "37",
+        "bestRating": "5"
+      },
+      "founder": [
+        { "@type": "Person", "name": "Dip Choksi",     "telephone": "+918238216622" },
+        { "@type": "Person", "name": "Kairavi Choksi", "telephone": "+919726019001" }
+      ],
+      "sameAs": [
+        "https://www.justdial.com",
+        "https://www.facebook.com"
+      ]
+    }
+    </script>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <title>Choksi Classes</title>
+    <style>
+      * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+      body { font-family: 'Inter', sans-serif; background-color: #F5F0E8; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>

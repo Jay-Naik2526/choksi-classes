@@ -1,0 +1,13 @@
+{
+  "name": "choksi-classes",
+  "version": "1.0.0",
+  "description": "Choksi Classes — Full-stack tuition management portal, Navsari, Gujarat",
+  "private": true,
+  "scripts": {
+    "dev:backend":  "cd backend && node server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build":        "cd frontend && npm run build",
+    "start":        "cd backend && NODE_ENV=production node server.js",
+    "install:all":  "cd backend && npm install && cd ../frontend && npm install"
+  }
+}
