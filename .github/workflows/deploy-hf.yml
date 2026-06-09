@@ -1,0 +1,46 @@
+name: Deploy Backend to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build and Push Backend to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Create a clean deployment folder
+          mkdir -p temp_hf_deploy
+
+          # Copy everything from backend including dotfiles (.gitignore, etc.)
+          cp -r backend/* temp_hf_deploy/
+          if [ -f backend/.gitignore ]; then
+            cp backend/.gitignore temp_hf_deploy/
+          fi
+
+          # Go into the deployment folder
+          cd temp_hf_deploy
+
+          # Initialize git and configure user details
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Add the Hugging Face Spaces remote
+          # Using '.' as username is the official way to authenticate with token on Hugging Face Spaces
+          git remote add origin https://.:$HF_TOKEN@huggingface.co/spaces/Jay-Naik2526/choksi-classes
+
+          # Set branch to main, stage all files, and force push
+          git checkout -b main
+          git add -A
+          git commit -m "Deploy backend to Hugging Face Spaces (clean push)"
+          git push -f origin main

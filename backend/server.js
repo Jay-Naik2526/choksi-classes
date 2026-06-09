@@ -114,7 +114,7 @@ app.use((err, req, res, next) => {
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 
 // ── Start ────────────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 7860;
 server.listen(PORT, () =>
     console.log(`🚀 Choksi Classes API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
 );
