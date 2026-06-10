@@ -248,7 +248,7 @@ export default function MaterialList() {
 
                         {/* ── Root: subject folders ──────────────────── */}
                         {atRoot && (
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {subjectNames.map((sub, idx) => {
                                     const { bg, icon } = folderColor(idx);
                                     return (
@@ -278,7 +278,7 @@ export default function MaterialList() {
                             <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-wider px-1"
                                     style={{ color: '#2C1810', opacity: 0.4 }}>Chapters</p>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {chapterNames.map((ch, idx) => {
                                         const { bg, icon } = folderColor(idx + 2);
                                         const count = (subjectMap[currentSubject]?.[ch] || []).length;

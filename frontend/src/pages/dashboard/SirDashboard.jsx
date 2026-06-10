@@ -159,8 +159,7 @@ export default function SirDashboard() {
 
                 {/* ── ROW 1: Overview + Class Health ── */}
                 <StaggerContainer
-                    className="px-5 grid gap-3"
-                    style={{ gridTemplateColumns: '1fr 1fr' }}
+                    className="px-5 grid grid-cols-1 sm:grid-cols-2 gap-3"
                 >
                     {/* Overview */}
                     <StaggerItem>
@@ -211,14 +210,13 @@ export default function SirDashboard() {
 
                 {/* ── ROW 2: Quick Actions + Tests ── */}
                 <StaggerContainer
-                    className="px-5 mt-3 grid gap-3"
-                    style={{ gridTemplateColumns: '1.1fr 1fr' }}
+                    className="px-5 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3"
                 >
                     {/* Quick Actions */}
                     <StaggerItem>
                         <div className="rounded-2xl p-4" style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
                             <p className="font-bold mb-3" style={{ fontFamily: 'Playfair Display, serif', color: '#2C1810', fontSize: 13 }}>Quick Actions</p>
-                            <div className="grid grid-cols-4 gap-1.5">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                                 {QUICK.map(({ label, icon: Icon, path, color }) => (
                                     <motion.button
                                         key={label}
@@ -278,8 +276,7 @@ export default function SirDashboard() {
 
                 {/* ── ROW 3: Doubts + Fees ── */}
                 <StaggerContainer
-                    className="px-5 mt-3 grid gap-3"
-                    style={{ gridTemplateColumns: '1fr 1fr' }}
+                    className="px-5 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3"
                 >
                     {/* Doubts */}
                     <StaggerItem>

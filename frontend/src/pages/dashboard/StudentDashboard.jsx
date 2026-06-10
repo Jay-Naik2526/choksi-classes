@@ -133,7 +133,7 @@ export default function StudentDashboard() {
                 </motion.div>
 
                 {/* ── ROW 1: Next Test + Study Progress ── */}
-                <StaggerContainer className="px-5 grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <StaggerContainer className="px-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Featured / Next Test */}
                     <StaggerItem>
                         <SpotlightCard
@@ -191,7 +191,7 @@ export default function StudentDashboard() {
                 </StaggerContainer>
 
                 {/* ── ROW 2: Schedule + Materials ── */}
-                <div className="px-5 mt-3 grid gap-3" style={{ gridTemplateColumns: '1fr 1.6fr' }}>
+                <div className="px-5 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                     {/* Schedule */}
                     <motion.div

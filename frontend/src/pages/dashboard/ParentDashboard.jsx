@@ -170,7 +170,7 @@ export default function ParentDashboard() {
                             </GlowCard>
 
                             {/* ── STATS ROW ── */}
-                            <StaggerContainer style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                            <StaggerContainer className="grid grid-cols-3 gap-2.5 mb-4">
                                 {[
                                     { label: 'Tests',  value: child.testsTaken || 0,   color: '#C1440E', sub: 'taken' },
                                     { label: 'Avg',    value: child.avgScore || 0,      color: '#E8A020', sub: 'score', suffix: '%' },
@@ -195,7 +195,7 @@ export default function ParentDashboard() {
                             </StaggerContainer>
 
                             {/* ── RING + BATCHES ── */}
-                            <StaggerContainer style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12, marginBottom: 16 }}>
+                            <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                 <StaggerItem>
                                     <SpotlightCard
                                         spotColor="rgba(193,68,14,0.08)"
@@ -283,7 +283,7 @@ export default function ParentDashboard() {
 
                             {/* ── QUICK ACTIONS ── */}
                             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(44,24,16,0.4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Quick Access</p>
-                            <StaggerContainer style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+                            <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-6">
                                 {[
                                     { label: 'Tests & Results', icon: FileText, path: '/tests',     color: '#2563eb' },
                                     { label: 'Materials',       icon: BookOpen, path: '/materials', color: '#16a34a' },

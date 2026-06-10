@@ -120,7 +120,7 @@ export default function CreateTest() {
                                     placeholder="e.g. Mid-Term Mathematics Test"
                                     className={inputCls} style={inputStyle} {...fh} />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#2C1810', opacity: 0.6 }}>Subject *</label>
                                     <input value={details.subject} onChange={e => handleDetail('subject', e.target.value)}
@@ -136,7 +136,7 @@ export default function CreateTest() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#2C1810', opacity: 0.6 }}>Date *</label>
                                     <input type="datetime-local" value={details.date} onChange={e => handleDetail('date', e.target.value)}
@@ -216,7 +216,7 @@ export default function CreateTest() {
                                             </div>
                                         )}
 
-                                        <div className="grid grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             <div>
                                                 <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#2C1810', opacity: 0.6 }}>Marks</label>
                                                 <input type="number" value={q.marks} onChange={e => updateQuestion(i, 'marks', e.target.value)}
