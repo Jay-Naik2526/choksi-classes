@@ -3,7 +3,7 @@
  * Framer-Motion powered. Drop any of these into any page.
  */
 import { useRef, useState, useEffect } from 'react';
-import { motion, useInView, useSpring, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useInView, useSpring, useMotionValue, useTransform, useScroll, AnimatePresence } from 'framer-motion';
 
 /* ─────────────────────────────────────────────────────────────────────────
    SPOTLIGHT CARD
@@ -412,5 +412,245 @@ export function PageTransition({ children }) {
         >
             {children}
         </motion.div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RETRO GRID
+   Perspective vanishing-point grid — signature 21st.dev hero decoration.
+   Place as absolute fill at the bottom of any dark section.
+───────────────────────────────────────────────────────────────────────── */
+export function RetroGrid({ opacity = 0.38, bgColor = '#0D0603', lineColor = 'rgba(193,68,14,' }) {
+    return (
+        <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            height: '52%', overflow: 'hidden', pointerEvents: 'none', zIndex: 1,
+            perspective: '280px',
+        }}>
+            <div style={{
+                position: 'absolute', inset: 0,
+                transform: 'rotateX(68deg)',
+                transformOrigin: 'top center',
+                backgroundImage: `
+                    linear-gradient(to right, ${lineColor}${opacity}) 1px, transparent 1px),
+                    linear-gradient(to bottom, ${lineColor}${opacity * 0.55}) 1px, transparent 1px)
+                `,
+                backgroundSize: '56px 36px',
+            }}>
+                <div style={{
+                    position: 'absolute', inset: 0,
+                    background: `linear-gradient(to top, transparent 20%, ${bgColor} 82%)`,
+                }} />
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   METEORS
+   Shooting-star streaks that fly diagonally across dark backgrounds.
+───────────────────────────────────────────────────────────────────────── */
+const METEOR_DATA = Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    top:      `${(i * 11 + 5) % 88}%`,
+    left:     `${(i * 17 + 3) % 115}%`,
+    delay:    `${(i * 0.45) % 6}s`,
+    duration: `${2.8 + (i % 4) * 0.6}s`,
+    width:    90 + (i % 3) * 55,
+}));
+
+export function Meteors({ count = 20, color = 'rgba(255,255,255,0.55)' }) {
+    const meteors = METEOR_DATA.slice(0, count);
+    return (
+        <>
+            <style>{`
+                @keyframes meteorFall {
+                    0%   { transform: rotate(215deg) translateX(0);      opacity: 0; }
+                    6%   { opacity: 1; }
+                    78%  { opacity: 1; }
+                    100% { transform: rotate(215deg) translateX(-600px); opacity: 0; }
+                }
+            `}</style>
+            {meteors.map(m => (
+                <span key={m.id} style={{
+                    position: 'absolute', top: m.top, left: m.left,
+                    width: m.width, height: 1.5, borderRadius: 9999,
+                    background: `linear-gradient(to right, transparent, ${color})`,
+                    animation: `meteorFall ${m.duration} linear ${m.delay} infinite`,
+                    pointerEvents: 'none', zIndex: 1,
+                }} />
+            ))}
+        </>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LETTER REVEAL
+   Animates each character individually into view on scroll.
+───────────────────────────────────────────────────────────────────────── */
+export function LetterReveal({ children, delay = 0, style = {} }) {
+    const ref = useRef(null);
+    const inView = useInView(ref, { once: true, amount: 0.3 });
+    const letters = String(children).split('');
+    return (
+        <span ref={ref} style={{ display: 'inline', ...style }}>
+            {letters.map((ch, i) => (
+                <motion.span
+                    key={i}
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={inView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ delay: delay + i * 0.028, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ display: 'inline-block' }}
+                >
+                    {ch === ' ' ? ' ' : ch}
+                </motion.span>
+            ))}
+        </span>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FLIP CARD
+   3-D card that flips on hover to reveal a back face.
+───────────────────────────────────────────────────────────────────────── */
+export function FlipCard({ front, back, height = 220, style = {} }) {
+    const [flipped, setFlipped] = useState(false);
+    return (
+        <div
+            onMouseEnter={() => setFlipped(true)}
+            onMouseLeave={() => setFlipped(false)}
+            style={{ perspective: 1200, cursor: 'pointer', ...style, height }}
+        >
+            <motion.div
+                animate={{ rotateY: flipped ? 180 : 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                style={{ width: '100%', height: '100%', transformStyle: 'preserve-3d', position: 'relative' }}
+            >
+                {/* front */}
+                <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+                    {front}
+                </div>
+                {/* back */}
+                <div style={{ position: 'absolute', inset: 0, transform: 'rotateY(180deg)', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+                    {back}
+                </div>
+            </motion.div>
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RIPPLE BUTTON
+   Click anywhere → expanding ripple wave from that point.
+───────────────────────────────────────────────────────────────────────── */
+export function RippleButton({ children, onClick, style = {}, disabled = false }) {
+    const [ripples, setRipples] = useState([]);
+    const handleClick = (e) => {
+        if (disabled) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const id = Date.now() + Math.random();
+        setRipples(prev => [...prev, { x: e.clientX - rect.left, y: e.clientY - rect.top, id }]);
+        setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 800);
+        onClick?.(e);
+    };
+    return (
+        <button onClick={handleClick} disabled={disabled}
+            style={{ position: 'relative', overflow: 'hidden', cursor: disabled ? 'not-allowed' : 'pointer', border: 'none', ...style }}>
+            {children}
+            {ripples.map(r => (
+                <motion.span key={r.id}
+                    initial={{ scale: 0, opacity: 0.45 }}
+                    animate={{ scale: 5, opacity: 0 }}
+                    transition={{ duration: 0.75, ease: 'easeOut' }}
+                    style={{
+                        position: 'absolute', left: r.x, top: r.y,
+                        width: 60, height: 60, marginLeft: -30, marginTop: -30,
+                        borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.35)',
+                        pointerEvents: 'none',
+                    }}
+                />
+            ))}
+        </button>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ANIMATED BADGE
+   Pulsing badge with a sweeping shimmer — great for "NEW" / "FIRST" claims.
+───────────────────────────────────────────────────────────────────────── */
+export function AnimatedBadge({ children, color = '#E8A020', style = {} }) {
+    return (
+        <div style={{ display: 'inline-flex', alignItems: 'center', ...style }}>
+            <div style={{
+                position: 'relative', overflow: 'hidden',
+                padding: '7px 18px', borderRadius: 50,
+                backgroundColor: `${color}18`, border: `1.5px solid ${color}45`,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+            }}>
+                <motion.div
+                    animate={{ x: ['-100%', '220%'] }}
+                    transition={{ repeat: Infinity, duration: 3.2, ease: 'easeInOut', repeatDelay: 1.8 }}
+                    style={{
+                        position: 'absolute', top: 0, bottom: 0, width: '55%',
+                        background: `linear-gradient(90deg, transparent, ${color}38, transparent)`,
+                        pointerEvents: 'none',
+                    }}
+                />
+                <motion.div
+                    animate={{ scale: [1, 1.7, 1], opacity: [1, 0.4, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.9 }}
+                    style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }}
+                />
+                <span style={{ color, fontWeight: 700, fontSize: 11, letterSpacing: '0.13em', textTransform: 'uppercase', position: 'relative', zIndex: 1 }}>
+                    {children}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCROLL TEXT
+   Each word lights up from dim → bright as you scroll past it.
+───────────────────────────────────────────────────────────────────────── */
+function ScrollWord({ word, progress, start, end }) {
+    const opacity = useTransform(progress, [start, Math.min(end, 1)], [0.16, 1]);
+    return <motion.span style={{ opacity, display: 'inline-block' }}>{word}&nbsp;</motion.span>;
+}
+
+export function ScrollText({ children, style = {} }) {
+    const ref = useRef(null);
+    const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.88', 'end 0.22'] });
+    const words = String(children).split(' ');
+    return (
+        <p ref={ref} style={{ display: 'flex', flexWrap: 'wrap', gap: 0, ...style }}>
+            {words.map((word, i) => (
+                <ScrollWord
+                    key={i} word={word} progress={scrollYProgress}
+                    start={i / words.length}
+                    end={(i + 2.2) / words.length}
+                />
+            ))}
+        </p>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ANIMATED BEAM LINE
+   Glowing laser line that sweeps left → right — connects steps / icons.
+───────────────────────────────────────────────────────────────────────── */
+export function BeamLine({ color = '#C1440E', style = {} }) {
+    return (
+        <div style={{ flex: 1, height: 2, position: 'relative', overflow: 'hidden',
+            backgroundColor: `${color}18`, borderRadius: 2, ...style }}>
+            <motion.div
+                animate={{ x: ['-100%', '200%'] }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: 'linear', repeatDelay: 0.6 }}
+                style={{
+                    position: 'absolute', inset: 0,
+                    background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+                }}
+            />
+        </div>
     );
 }

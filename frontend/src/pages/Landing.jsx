@@ -1,16 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion';
 import {
     Star, MapPin, Phone, ArrowRight, BookOpen,
     Award, ChevronDown, Sparkles, GraduationCap,
-    TrendingUp, Quote, ExternalLink,
+    TrendingUp, Quote, ExternalLink, Check, X,
+    Bell, ClipboardList, Inbox, Users, Smartphone,
+    MessageSquare, IndianRupee, FileText, Zap,
 } from 'lucide-react';
 import {
     SpotlightCard, BorderBeam, ShimmerButton, MagneticButton,
     NumberTicker, WordRotate, TiltCard, GlowCard,
     StaggerContainer, StaggerItem, FadeUp,
     AuroraBackground, DotGrid, GradientText, PageTransition,
+    Meteors, RetroGrid, LetterReveal, FlipCard, RippleButton,
+    AnimatedBadge, ScrollText, BeamLine,
 } from '../components/ui/MagicUI';
 
 /* ────────────────────────────────────────────────
@@ -28,6 +32,7 @@ const STYLES = `
 @keyframes marqueeR { 0%{ transform:translateX(-50%); } 100%{ transform:translateX(0); } }
 @keyframes bounceDown { 0%,100%{ transform:translateY(0); opacity:1; } 50%{ transform:translateY(8px); opacity:.5; } }
 @keyframes livePulse { 0%,100%{ box-shadow:0 0 0 0 rgba(37,211,102,0.5); } 50%{ box-shadow:0 0 0 8px rgba(37,211,102,0); } }
+@keyframes checkPop { 0%{ transform:scale(0) rotate(-20deg); } 70%{ transform:scale(1.2) rotate(4deg); } 100%{ transform:scale(1) rotate(0deg); } }
 
 .animate-float-a { animation:floatA 7s ease-in-out infinite; }
 .animate-float-b { animation:floatB 9s ease-in-out infinite; }
@@ -79,6 +84,70 @@ const COURSES = [
     { icon: GraduationCap, title:'GSEB Board',      sub:'Std 1 – 12',  desc:'Gujarat State Board coaching in Gujarati and English medium for all subjects.',                       color:'#E8A020', bg:'rgba(232,160,32,0.10)' },
     { icon: TrendingUp,    title:'Commerce Stream', sub:'Std 11 – 12', desc:'Accounts, Economics, Business Studies & Stats — taught by CA Kairavi Choksi with real-world expertise.', color:'#2563eb', bg:'rgba(37,99,235,0.10)' },
     { icon: Award,         title:'Daily Evaluation',sub:'All Batches', desc:'Daily tests, regular assessments, and doubt-clearing sessions ensure continuous progress.',            color:'#16a34a', bg:'rgba(22,163,74,0.10)' },
+];
+
+const PORTAL_FEATURES = [
+    {
+        icon: Smartphone, title: 'Student Portal',
+        desc: 'Tests, homework, materials, doubts — all in one private dashboard. Every student gets their own login.',
+        color: '#C1440E', bg: 'rgba(193,68,14,0.10)', large: true,
+        items: ['Digital Tests & Results', 'Homework Tracking', 'Study Materials', 'Doubt Clearing'],
+        flip: 'India\'s coaching classes run on WhatsApp. Choksi Classes runs on a full portal — built exclusively for students.',
+    },
+    {
+        icon: Users, title: 'Parent Dashboard',
+        desc: 'Fee tracking, child\'s progress, and live notices — parents always know what\'s happening.',
+        color: '#2563eb', bg: 'rgba(37,99,235,0.10)',
+        items: ['Fee History & Dues', 'Test Scores', 'Notice Board'],
+        flip: 'Parents can check fees, progress reports and school notices any time — no WhatsApp chasing.',
+    },
+    {
+        icon: FileText, title: 'Digital Tests',
+        desc: 'Auto-graded tests with instant results. Sir creates once — students attempt online.',
+        color: '#16a34a', bg: 'rgba(22,163,74,0.10)',
+        items: ['MCQ + Subjective', 'Auto-graded'],
+        flip: 'No paper, no manual correction. Tests created once, results delivered instantly.',
+    },
+    {
+        icon: ClipboardList, title: 'Homework System',
+        desc: 'Assign homework batch-wise. Students submit digitally. Sir reviews in-portal.',
+        color: '#E8A020', bg: 'rgba(232,160,32,0.10)',
+        items: ['Batch-wise assign', 'Digital submit'],
+        flip: 'Homework assigned digitally — no lost papers, no excuses. Every submission tracked.',
+    },
+    {
+        icon: Bell, title: 'Push Notifications',
+        desc: 'Instant alerts to students & parents — new tests, notices, fees — even when app is closed.',
+        color: '#7c3aed', bg: 'rgba(124,58,237,0.10)',
+        items: ['Instant delivery', 'Works offline'],
+        flip: 'Like a WhatsApp message — but smarter. Goes directly to the student or parent\'s phone.',
+    },
+    {
+        icon: Inbox, title: 'Admissions Inbox',
+        desc: 'Every enquiry from the website lands here. Sir sees it first — track, follow up, enroll.',
+        color: '#059669', bg: 'rgba(5,150,105,0.10)',
+        items: ['Lead tracking', 'Status pipeline'],
+        flip: 'Sir gets a private inbox for every admission enquiry — no emails, no missed leads.',
+    },
+];
+
+const COMPARISON = [
+    { feature: 'Student Login Portal',        us: true, them: false },
+    { feature: 'Parent Dashboard',            us: true, them: false },
+    { feature: 'Digital Tests & Auto-grading',us: true, them: false },
+    { feature: 'Online Homework System',      us: true, them: false },
+    { feature: 'Fee Tracking Online',         us: true, them: false },
+    { feature: 'Push Notifications',          us: true, them: false },
+    { feature: 'Doubt Clearing System',       us: true, them: false },
+    { feature: 'Admissions Inbox for Sir',    us: true, them: false },
+    { feature: 'Study Materials Library',     us: true, them: false },
+    { feature: 'WhatsApp Group',              us: true, them: true  },
+];
+
+const HOW_STEPS = [
+    { num: '01', title: 'Enquire',   desc: 'Fill the form on our Admissions page — takes 60 seconds. Sir gets notified instantly.',    icon: Phone,         color: '#C1440E' },
+    { num: '02', title: 'Enroll',    desc: 'Join your batch. Get your student login. Access everything from day one.',                   icon: GraduationCap, color: '#E8A020' },
+    { num: '03', title: 'Excel',     desc: 'Daily tests, live results, doubt clearing — everything you need to top your board exams.',   icon: TrendingUp,    color: '#16a34a' },
 ];
 
 /* ────────────────────────────────────────────────
@@ -151,6 +220,90 @@ function StatCard({ value, isFixed, suffix, label, note, color, delay }) {
 }
 
 /* ────────────────────────────────────────────────
+   PORTAL FEATURE BENTO CARD
+──────────────────────────────────────────────── */
+function BentoCard({ feature, index }) {
+    const cardStyle = {
+        borderRadius: 22, overflow: 'hidden', height: '100%',
+        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(12px)',
+    };
+    const front = (
+        <SpotlightCard spotColor={`${feature.color}20`} style={{ ...cardStyle, padding: feature.large ? 36 : 28, height: '100%' }}>
+            <BorderBeam colorA={feature.color} colorB="#E8A020" duration={5 + index} />
+            <div style={{ width: feature.large ? 56 : 44, height: feature.large ? 56 : 44, borderRadius: feature.large ? 18 : 14, backgroundColor: feature.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: feature.large ? 22 : 16 }}>
+                <feature.icon size={feature.large ? 26 : 20} color={feature.color} />
+            </div>
+            <p style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, color: '#F5F0E8', fontSize: feature.large ? 22 : 17, marginBottom: 8 }}>{feature.title}</p>
+            <p style={{ color: 'rgba(245,240,232,0.5)', fontSize: 13, lineHeight: 1.7, marginBottom: feature.large ? 20 : 14 }}>{feature.desc}</p>
+            {feature.items && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {feature.items.map((item, i) => (
+                        <span key={i} style={{ padding: '4px 10px', borderRadius: 50, backgroundColor: `${feature.color}18`, border: `1px solid ${feature.color}35`, color: feature.color, fontSize: 11, fontWeight: 600 }}>
+                            {item}
+                        </span>
+                    ))}
+                </div>
+            )}
+            <p style={{ position: 'absolute', bottom: 14, right: 18, color: 'rgba(255,255,255,0.2)', fontSize: 10, letterSpacing: '0.08em' }}>HOVER TO FLIP →</p>
+        </SpotlightCard>
+    );
+    const back = (
+        <div style={{ ...cardStyle, padding: feature.large ? 36 : 28, backgroundColor: feature.color, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', height: '100%' }}>
+            <feature.icon size={36} color="rgba(255,255,255,0.6)" style={{ marginBottom: 20 }} />
+            <p style={{ color: '#fff', fontSize: feature.large ? 17 : 14, lineHeight: 1.75, fontWeight: 500 }}>{feature.flip}</p>
+        </div>
+    );
+    return <FlipCard front={front} back={back} height={feature.large ? 280 : 220} />;
+}
+
+/* ────────────────────────────────────────────────
+   COMPARISON ROW
+──────────────────────────────────────────────── */
+function CompareRow({ feature, us, them, index }) {
+    const ref = useRef(null);
+    const inView = useInView(ref, { once: true, amount: 0.5 });
+    return (
+        <motion.div
+            ref={ref}
+            initial={{ opacity: 0, x: -20 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ delay: index * 0.06, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+                display: 'grid', gridTemplateColumns: '1fr auto auto',
+                alignItems: 'center', gap: 16,
+                padding: '14px 20px',
+                borderRadius: 12,
+                backgroundColor: index % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent',
+                border: '1px solid rgba(255,255,255,0.04)',
+            }}
+        >
+            <span style={{ color: 'rgba(245,240,232,0.75)', fontSize: 14, fontWeight: 500 }}>{feature}</span>
+            <motion.div
+                initial={{ scale: 0 }}
+                animate={inView ? { scale: 1 } : {}}
+                transition={{ delay: index * 0.06 + 0.2, type: 'spring', stiffness: 280, damping: 18 }}
+                style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'rgba(22,163,74,0.15)', border: '1.5px solid #16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+                <Check size={15} color="#16a34a" strokeWidth={2.5} />
+            </motion.div>
+            <motion.div
+                initial={{ scale: 0 }}
+                animate={inView ? { scale: 1 } : {}}
+                transition={{ delay: index * 0.06 + 0.3, type: 'spring', stiffness: 280, damping: 18 }}
+                style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: them ? 'rgba(22,163,74,0.1)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${them ? '#16a34a' : '#ef4444'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+                {them
+                    ? <Check size={15} color="#16a34a" strokeWidth={2.5} />
+                    : <X size={15} color="#ef4444" strokeWidth={2.5} />
+                }
+            </motion.div>
+        </motion.div>
+    );
+}
+
+/* ────────────────────────────────────────────────
    MAIN
 ──────────────────────────────────────────────── */
 export default function Landing() {
@@ -160,7 +313,6 @@ export default function Landing() {
     const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '25%']);
     const heroOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
-    /* hero mouse spotlight */
     const [heroSpot, setHeroSpot] = useState({ x: '50%', y: '50%' });
     const handleHeroMove = (e) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -180,11 +332,9 @@ export default function Landing() {
                     onMouseMove={handleHeroMove}
                     style={{ minHeight: '100vh', backgroundColor: '#0D0603', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
                 >
-                    {/* aurora blobs */}
                     <AuroraBackground colors={['#C1440E','#E8A020','#1a0a05']} opacity={0.22} />
-
-                    {/* dot grid */}
                     <DotGrid color="rgba(193,68,14,0.08)" size={32} />
+                    <Meteors count={18} color="rgba(193,68,14,0.45)" />
 
                     {/* hero mouse spotlight */}
                     <div style={{
@@ -202,7 +352,7 @@ export default function Landing() {
                         }} />
                     ))}
 
-                    {/* rings decoration */}
+                    {/* rings */}
                     <div className="animate-spin-slow" style={{ position: 'absolute', top: '7%', right: '5%', width: 190, height: 190, borderRadius: '50%', border: '1.5px dashed rgba(193,68,14,0.2)', pointerEvents: 'none', zIndex: 1 }} />
                     <div className="animate-spin-slow-r" style={{ position: 'absolute', top: '7%', right: '5%', width: 148, height: 148, margin: '21px', borderRadius: '50%', border: '1.5px solid rgba(232,160,32,0.12)', pointerEvents: 'none', zIndex: 1 }} />
                     <div style={{ position: 'absolute', top: '7%', right: '5%', width: 190, height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
@@ -233,39 +383,30 @@ export default function Landing() {
                             >
                                 Enquire
                             </motion.button>
-                            <ShimmerButton onClick={() => navigate('/login')} style={{ padding: '9px 20px', borderRadius: 12, backgroundColor: '#C1440E', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <RippleButton onClick={() => navigate('/login')} style={{ padding: '9px 20px', borderRadius: 12, backgroundColor: '#C1440E', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                                 Login <ArrowRight size={13} />
-                            </ShimmerButton>
+                            </RippleButton>
                         </div>
                     </motion.nav>
 
-                    {/* HERO CONTENT with parallax */}
-                    <motion.div
-                        style={{ y: heroY, opacity: heroOpacity }}
-                        className=""
-                    >
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center', position: 'relative', zIndex: 5 }}>
+                    {/* HERO CONTENT */}
+                    <motion.div style={{ y: heroY, opacity: heroOpacity }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px 120px', textAlign: 'center', position: 'relative', zIndex: 5 }}>
 
                             {/* badge */}
                             <motion.div
                                 initial={{ opacity: 0, y: 20, scale: 0.9 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 24 }}
-                                style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                                    padding: '7px 18px', borderRadius: 50, marginBottom: 36,
-                                    backgroundColor: 'rgba(193,68,14,0.15)', border: '1px solid rgba(193,68,14,0.3)',
-                                }}
+                                style={{ marginBottom: 36 }}
                             >
-                                <Sparkles size={13} color="#E8A020" />
-                                <span style={{ color: 'rgba(245,240,232,0.8)', fontSize: 12, fontWeight: 500, letterSpacing: '0.05em' }}>
+                                <AnimatedBadge color="#E8A020">
                                     CBSE · GSEB · Std 1–12 · 20+ Years Experience
-                                </span>
+                                </AnimatedBadge>
                             </motion.div>
 
                             <HeroTitle />
 
-                            {/* subtitle with word rotate */}
                             <motion.p
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -279,7 +420,6 @@ export default function Landing() {
                                 , with <strong style={{ color: 'rgba(245,240,232,0.85)', fontWeight: 700 }}>20+ years</strong> of proven excellence.
                             </motion.p>
 
-                            {/* star row */}
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -293,7 +433,6 @@ export default function Landing() {
                                 <span style={{ color: 'rgba(245,240,232,0.35)', fontSize: 12 }}>37 Google Reviews</span>
                             </motion.div>
 
-                            {/* CTA buttons */}
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -302,25 +441,13 @@ export default function Landing() {
                             >
                                 <MagneticButton
                                     onClick={() => navigate('/login')}
-                                    style={{
-                                        padding: '15px 38px', borderRadius: 16,
-                                        backgroundColor: '#C1440E', color: '#fff',
-                                        fontSize: 15, fontWeight: 700,
-                                        display: 'flex', alignItems: 'center', gap: 8,
-                                        boxShadow: '0 8px 32px rgba(193,68,14,0.5)',
-                                    }}
+                                    style={{ padding: '15px 38px', borderRadius: 16, backgroundColor: '#C1440E', color: '#fff', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(193,68,14,0.5)' }}
                                 >
                                     Student Login <ArrowRight size={16} />
                                 </MagneticButton>
                                 <MagneticButton
                                     onClick={() => navigate('/admissions')}
-                                    style={{
-                                        padding: '15px 38px', borderRadius: 16,
-                                        backgroundColor: 'transparent', color: 'rgba(245,240,232,0.8)',
-                                        fontSize: 15, fontWeight: 600,
-                                        border: '1.5px solid rgba(245,240,232,0.2)',
-                                        display: 'flex', alignItems: 'center', gap: 8,
-                                    }}
+                                    style={{ padding: '15px 38px', borderRadius: 16, backgroundColor: 'transparent', color: 'rgba(245,240,232,0.8)', fontSize: 15, fontWeight: 600, border: '1.5px solid rgba(245,240,232,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}
                                 >
                                     Enroll Now
                                 </MagneticButton>
@@ -333,6 +460,9 @@ export default function Landing() {
                         <span style={{ color: 'rgba(245,240,232,0.28)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>scroll</span>
                         <ChevronDown size={16} color="rgba(245,240,232,0.28)" />
                     </div>
+
+                    {/* retro grid at bottom */}
+                    <RetroGrid opacity={0.32} bgColor="#0D0603" />
 
                     {/* angled cut */}
                     <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 80, backgroundColor: '#C1440E', clipPath: 'polygon(0 100%,100% 100%,100% 100%,0 30%)', zIndex: 6 }} />
@@ -381,17 +511,85 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §4  ABOUT
+                    §4  NAVSARI'S FIRST PORTAL  ← NEW
+                ══════════════════════════════════════════════ */}
+                <section style={{ backgroundColor: '#0A0502', padding: '110px 24px', position: 'relative', overflow: 'hidden' }}>
+                    <AuroraBackground colors={['#1a0a04', '#C1440E', '#0A0502']} opacity={0.12} />
+                    <DotGrid color="rgba(193,68,14,0.04)" size={40} />
+
+                    <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 2 }}>
+
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', marginBottom: 72 }}>
+                            <FadeUp>
+                                <AnimatedBadge color="#E8A020" style={{ marginBottom: 28, display: 'flex', justifyContent: 'center' }}>
+                                    🏆 Navsari's First &amp; Only
+                                </AnimatedBadge>
+                                <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(30px,5vw,56px)', fontWeight: 900, color: '#F5F0E8', lineHeight: 1.1, marginBottom: 20 }}>
+                                    Every Other Class Uses WhatsApp.<br />
+                                    <GradientText colors={['#C1440E','#E8A020','#F5D080','#E8A020','#C1440E']}>
+                                        We Built a Portal.
+                                    </GradientText>
+                                </h2>
+                            </FadeUp>
+                            <FadeUp delay={0.1}>
+                                <ScrollText
+                                    baseColor="rgba(245,240,232,0.18)"
+                                    activeColor="rgba(245,240,232,0.88)"
+                                    style={{ color: 'rgba(245,240,232,0.88)', fontSize: 16, lineHeight: 1.9, maxWidth: 620, margin: '0 auto', justifyContent: 'center' }}
+                                >
+                                    Verified by research — no other coaching class in Navsari has anything close to this. Students, parents and Sir all get their own private dashboard. Not a third-party app. Built exclusively for Choksi Classes.
+                                </ScrollText>
+                            </FadeUp>
+                        </div>
+
+                        {/* Bento Grid */}
+                        <StaggerContainer style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: 16,
+                        }}>
+                            {/* Large card — Student Portal */}
+                            <StaggerItem style={{ gridColumn: '1 / 3', height: 280 }}>
+                                <BentoCard feature={PORTAL_FEATURES[0]} index={0} />
+                            </StaggerItem>
+
+                            {/* Parent Dashboard */}
+                            <StaggerItem style={{ height: 280 }}>
+                                <BentoCard feature={PORTAL_FEATURES[1]} index={1} />
+                            </StaggerItem>
+
+                            {/* Row 2 — 3 equal cards */}
+                            {PORTAL_FEATURES.slice(2).map((f, i) => (
+                                <StaggerItem key={f.title} style={{ height: 220 }}>
+                                    <BentoCard feature={f} index={i + 2} />
+                                </StaggerItem>
+                            ))}
+                        </StaggerContainer>
+
+                        {/* CTA strip below bento */}
+                        <FadeUp delay={0.2} style={{ textAlign: 'center', marginTop: 52 }}>
+                            <RippleButton
+                                onClick={() => navigate('/admissions')}
+                                style={{ padding: '16px 44px', borderRadius: 16, backgroundColor: '#C1440E', color: '#fff', fontSize: 15, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 32px rgba(193,68,14,0.4)', cursor: 'pointer' }}
+                            >
+                                <Zap size={16} /> Join Navsari's Only Digital Coaching Class
+                            </RippleButton>
+                        </FadeUp>
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════
+                    §5  ABOUT
                 ══════════════════════════════════════════════ */}
                 <section id="about" style={{ backgroundColor: '#F7F4EF', padding: '100px 24px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 64, alignItems: 'center' }}>
 
-                        {/* Left text */}
                         <FadeUp>
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 16 }}>◆ About Us</p>
                             <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 900, color: '#2C1810', lineHeight: 1.1, marginBottom: 24 }}>
                                 Where Knowledge<br/>
-                                <span style={{ color: '#C1440E', fontStyle: 'italic' }}>Meets Dedication</span>
+                                <LetterReveal delay={0.3} style={{ color: '#C1440E', fontStyle: 'italic' }}>Meets Dedication</LetterReveal>
                             </h2>
                             <p style={{ color: 'rgba(44,24,16,0.65)', fontSize: 16, lineHeight: 1.8, marginBottom: 20 }}>
                                 Choksi Classes is Navsari's most trusted coaching institute — with <strong style={{ color: '#2C1810' }}>20+ years of academic excellence</strong>, we coach students from Std 1 through 12 in CBSE and GSEB, with specialized Commerce coaching for Std 11–12.
@@ -404,18 +602,13 @@ export default function Landing() {
                                     <StaggerItem key={i}>
                                         <motion.div
                                             whileHover={{ scale: 1.06, y: -2 }}
-                                            style={{
-                                                padding: '8px 16px', borderRadius: 50, cursor: 'default',
-                                                backgroundColor: 'rgba(193,68,14,0.08)', border: '1px solid rgba(193,68,14,0.18)',
-                                                color: '#C1440E', fontSize: 12, fontWeight: 600,
-                                            }}
+                                            style={{ padding: '8px 16px', borderRadius: 50, cursor: 'default', backgroundColor: 'rgba(193,68,14,0.08)', border: '1px solid rgba(193,68,14,0.18)', color: '#C1440E', fontSize: 12, fontWeight: 600 }}
                                         >{chip}</motion.div>
                                     </StaggerItem>
                                 ))}
                             </StaggerContainer>
                         </FadeUp>
 
-                        {/* Right: 2×2 cards */}
                         <StaggerContainer style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                             {[
                                 { icon: '📚', title: 'CBSE Board',       sub: 'Std 1 – 10',  color: '#C1440E' },
@@ -441,7 +634,7 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §5  COURSES  (bento grid with BorderBeam)
+                    §6  COURSES
                 ══════════════════════════════════════════════ */}
                 <section style={{ backgroundColor: '#FFFFFF', padding: '100px 24px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -449,7 +642,7 @@ export default function Landing() {
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 14 }}>Our Courses</p>
                             <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 900, color: '#2C1810' }}>
                                 A Course For{' '}
-                                <span style={{ color: '#C1440E', fontStyle: 'italic' }}>Every Student</span>
+                                <LetterReveal style={{ color: '#C1440E', fontStyle: 'italic' }}>Every Student</LetterReveal>
                             </h2>
                         </FadeUp>
 
@@ -458,14 +651,7 @@ export default function Landing() {
                                 <StaggerItem key={i}>
                                     <SpotlightCard
                                         spotColor={`${c.color}15`}
-                                        style={{
-                                            position: 'relative', borderRadius: 24, padding: 36,
-                                            border: '1px solid rgba(44,24,16,0.07)',
-                                            backgroundColor: '#FAFAF8',
-                                            boxShadow: '0 4px 20px rgba(44,24,16,0.06)',
-                                            overflow: 'hidden',
-                                            height: '100%',
-                                        }}
+                                        style={{ position: 'relative', borderRadius: 24, padding: 36, border: '1px solid rgba(44,24,16,0.07)', backgroundColor: '#FAFAF8', boxShadow: '0 4px 20px rgba(44,24,16,0.06)', overflow: 'hidden', height: '100%' }}
                                     >
                                         <BorderBeam colorA={c.color} colorB={c.color === '#C1440E' ? '#E8A020' : c.color} duration={5 + i} />
                                         <div style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
@@ -483,7 +669,105 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §6  TESTIMONIALS
+                    §7  HOW IT WORKS  ← NEW
+                ══════════════════════════════════════════════ */}
+                <section style={{ backgroundColor: '#F7F4EF', padding: '100px 24px' }}>
+                    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+                        <FadeUp style={{ textAlign: 'center', marginBottom: 72 }}>
+                            <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 14 }}>Simple Process</p>
+                            <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 900, color: '#2C1810' }}>
+                                Join in{' '}
+                                <LetterReveal style={{ color: '#C1440E', fontStyle: 'italic' }}>3 Easy Steps</LetterReveal>
+                            </h2>
+                        </FadeUp>
+
+                        {/* Steps row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {HOW_STEPS.map((step, i) => (
+                                <>
+                                    <FadeUp key={step.num} delay={i * 0.15} style={{ flex: '1 1 220px', maxWidth: 280 }}>
+                                        <GlowCard glowColor={`${step.color}30`}>
+                                            <SpotlightCard
+                                                spotColor={`${step.color}14`}
+                                                style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32, border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 4px 20px rgba(44,24,16,0.06)', textAlign: 'center', position: 'relative', overflow: 'hidden' }}
+                                            >
+                                                <BorderBeam colorA={step.color} colorB="#E8A020" duration={4 + i} />
+                                                <motion.div
+                                                    initial={{ scale: 0, rotate: -20 }}
+                                                    whileInView={{ scale: 1, rotate: 0 }}
+                                                    transition={{ type: 'spring', stiffness: 260, damping: 20, delay: i * 0.12 }}
+                                                    viewport={{ once: true }}
+                                                    style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: `${step.color}15`, border: `2px solid ${step.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}
+                                                >
+                                                    <step.icon size={28} color={step.color} />
+                                                </motion.div>
+                                                <p style={{ fontFamily: 'Playfair Display, serif', fontSize: 13, fontWeight: 700, color: step.color, letterSpacing: '0.15em', marginBottom: 8 }}>{step.num}</p>
+                                                <p style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, fontWeight: 700, color: '#2C1810', marginBottom: 12 }}>{step.title}</p>
+                                                <p style={{ color: 'rgba(44,24,16,0.6)', fontSize: 14, lineHeight: 1.7 }}>{step.desc}</p>
+                                            </SpotlightCard>
+                                        </GlowCard>
+                                    </FadeUp>
+                                    {i < HOW_STEPS.length - 1 && (
+                                        <div key={`beam-${i}`} style={{ flex: '0 0 48px', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+                                            <BeamLine color="#C1440E" style={{ minWidth: 40 }} />
+                                        </div>
+                                    )}
+                                </>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════
+                    §8  COMPARISON TABLE  ← NEW
+                ══════════════════════════════════════════════ */}
+                <section style={{ backgroundColor: '#0D0603', padding: '110px 24px', position: 'relative', overflow: 'hidden' }}>
+                    <AuroraBackground colors={['#1a0a04','#C1440E','#0D0603']} opacity={0.1} />
+                    <DotGrid color="rgba(193,68,14,0.04)" size={38} />
+                    <RetroGrid opacity={0.28} bgColor="#0D0603" />
+
+                    <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative', zIndex: 2 }}>
+                        <FadeUp style={{ textAlign: 'center', marginBottom: 56 }}>
+                            <AnimatedBadge color="#C1440E" style={{ marginBottom: 24, display: 'flex', justifyContent: 'center' }}>
+                                Confirmed by Web Research
+                            </AnimatedBadge>
+                            <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(28px,4.5vw,50px)', fontWeight: 900, color: '#F5F0E8', lineHeight: 1.1, marginBottom: 16 }}>
+                                No One Else in Navsari<br/>
+                                <GradientText>Has Any of This.</GradientText>
+                            </h2>
+                            <p style={{ color: 'rgba(245,240,232,0.45)', fontSize: 14, lineHeight: 1.8 }}>
+                                We searched every coaching class in Navsari — Synergy, Ahura, and all others listed on Sulekha &amp; UrbanPro. None have a student portal.
+                            </p>
+                        </FadeUp>
+
+                        {/* Table header */}
+                        <FadeUp delay={0.1}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, padding: '10px 20px 16px', marginBottom: 4 }}>
+                                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 12, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Feature</span>
+                                <span style={{ color: '#E8A020', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', minWidth: 90 }}>Choksi Classes</span>
+                                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', minWidth: 90 }}>Others in Navsari</span>
+                            </div>
+
+                            <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)', padding: '8px 0' }}>
+                                {COMPARISON.map((row, i) => (
+                                    <CompareRow key={i} {...row} index={i} />
+                                ))}
+                            </div>
+                        </FadeUp>
+
+                        <FadeUp delay={0.2} style={{ textAlign: 'center', marginTop: 48 }}>
+                            <RippleButton
+                                onClick={() => navigate('/admissions')}
+                                style={{ padding: '15px 40px', borderRadius: 16, backgroundColor: '#C1440E', color: '#fff', fontSize: 15, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 32px rgba(193,68,14,0.4)', cursor: 'pointer' }}
+                            >
+                                Be Part of the First <ArrowRight size={16} />
+                            </RippleButton>
+                        </FadeUp>
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════
+                    §9  TESTIMONIALS
                 ══════════════════════════════════════════════ */}
                 <section style={{ backgroundColor: '#150906', padding: '100px 0', overflow: 'hidden' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
@@ -496,23 +780,12 @@ export default function Landing() {
                         </FadeUp>
                     </div>
 
-                    {/* horizontal scroll */}
                     <div style={{ display: 'flex', gap: 24, paddingLeft: 24, paddingRight: 24, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 12 }}>
                         {REVIEWS.map((r, i) => (
                             <TiltCard key={i} maxTilt={6} style={{ flexShrink: 0, width: 320 }}>
-                                <GlowCard
-                                    glowColor={`rgba(193,68,14,0.3)`}
-                                    style={{
-                                        borderRadius: 24, padding: 32, cursor: 'default',
-                                        background: 'rgba(255,255,255,0.04)',
-                                        backdropFilter: 'blur(20px)',
-                                        border: '1px solid rgba(255,255,255,0.07)',
-                                    }}
-                                >
+                                <GlowCard glowColor="rgba(193,68,14,0.3)" style={{ borderRadius: 24, padding: 32, cursor: 'default', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.07)' }}>
                                     <Quote size={28} color="rgba(193,68,14,0.35)" style={{ marginBottom: 20 }} />
-                                    <p style={{ color: 'rgba(245,240,232,0.8)', fontSize: 15, lineHeight: 1.75, marginBottom: 28, fontStyle: 'italic' }}>
-                                        "{r.text}"
-                                    </p>
+                                    <p style={{ color: 'rgba(245,240,232,0.8)', fontSize: 15, lineHeight: 1.75, marginBottom: 28, fontStyle: 'italic' }}>"{r.text}"</p>
                                     <div style={{ display: 'flex', gap: 3, marginBottom: 16 }}>
                                         {[...Array(r.stars)].map((_, s) => <Star key={s} size={13} fill="#E8A020" color="#E8A020" />)}
                                     </div>
@@ -532,7 +805,7 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §7  BIG CTA
+                    §10  BIG CTA
                 ══════════════════════════════════════════════ */}
                 <section style={{ backgroundColor: '#C1440E', padding: '100px 24px', position: 'relative', overflow: 'hidden' }}>
                     <AuroraBackground colors={['#a0360b','#E8A020','#7a2a08']} opacity={0.2} />
@@ -551,15 +824,15 @@ export default function Landing() {
                             Enroll Your Child<br/>in the Best Class
                         </h2>
                         <p style={{ color: 'rgba(255,255,255,0.72)', fontSize: 17, lineHeight: 1.7, marginBottom: 44 }}>
-                            Std 1–10 (CBSE & GSEB) · Std 11–12 Commerce — with daily tests, small batches, and a 24-hour helpline. 20+ years of proven results.
+                            Std 1–10 (CBSE &amp; GSEB) · Std 11–12 Commerce — with daily tests, small batches, and a 24-hour helpline. 20+ years of proven results. Navsari's only digital coaching portal.
                         </p>
                         <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-                            <ShimmerButton
+                            <RippleButton
                                 onClick={() => navigate('/admissions')}
-                                style={{ padding: '16px 40px', borderRadius: 16, backgroundColor: '#FFFFFF', color: '#C1440E', fontSize: 15, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 40px rgba(44,24,16,0.3)' }}
+                                style={{ padding: '16px 40px', borderRadius: 16, backgroundColor: '#FFFFFF', color: '#C1440E', fontSize: 15, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 40px rgba(44,24,16,0.3)', cursor: 'pointer' }}
                             >
                                 Enquire Now <ArrowRight size={17} />
-                            </ShimmerButton>
+                            </RippleButton>
                             <MagneticButton
                                 onClick={() => navigate('/login')}
                                 style={{ padding: '16px 40px', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 15, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 10, border: '1.5px solid rgba(255,255,255,0.3)' }}
@@ -571,7 +844,7 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §8  CONTACT CARDS
+                    §11  CONTACT CARDS
                 ══════════════════════════════════════════════ */}
                 <section style={{ backgroundColor: '#F7F4EF', padding: '80px 24px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -610,7 +883,7 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §9  GOOGLE MAPS
+                    §12  GOOGLE MAPS
                 ══════════════════════════════════════════════ */}
                 <section style={{ backgroundColor: '#F7F4EF', padding: '0 24px 80px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -635,7 +908,7 @@ export default function Landing() {
                 </section>
 
                 {/* ══════════════════════════════════════════════
-                    §10  FOOTER
+                    §13  FOOTER
                 ══════════════════════════════════════════════ */}
                 <footer style={{ backgroundColor: '#0D0603', padding: '48px 24px 32px', borderTop: '1px solid rgba(193,68,14,0.12)', position: 'relative', overflow: 'hidden' }}>
                     <DotGrid color="rgba(193,68,14,0.05)" size={30} />
@@ -646,7 +919,7 @@ export default function Landing() {
                             </div>
                             <div>
                                 <p style={{ fontFamily: 'Playfair Display, serif', color: '#F5F0E8', fontWeight: 700, fontSize: 15 }}>Choksi Classes</p>
-                                <p style={{ color: 'rgba(245,240,232,0.3)', fontSize: 11 }}>Navsari, Gujarat</p>
+                                <p style={{ color: 'rgba(245,240,232,0.3)', fontSize: 11 }}>Navsari's First Digital Coaching Portal</p>
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -674,17 +947,8 @@ export default function Landing() {
             <motion.a
                 href="https://wa.me/918238216622?text=Hi%2C%20I%20want%20to%20enquire%20about%20admissions%20at%20Choksi%20Classes."
                 target="_blank" rel="noopener noreferrer"
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.95 }}
-                style={{
-                    position: 'fixed', bottom: 24, right: 20, zIndex: 999,
-                    width: 56, height: 56, borderRadius: '50%',
-                    backgroundColor: '#25D366',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 4px 20px rgba(37,211,102,0.5)',
-                    textDecoration: 'none',
-                    animation: 'livePulse 2.5s ease infinite',
-                }}
+                whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.95 }}
+                style={{ position: 'fixed', bottom: 24, right: 20, zIndex: 999, width: 56, height: 56, borderRadius: '50%', backgroundColor: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(37,211,102,0.5)', textDecoration: 'none', animation: 'livePulse 2.5s ease infinite' }}
             >
                 <svg viewBox="0 0 32 32" width="28" height="28" fill="white">
                     <path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.678 4.61 1.854 6.5L4 29l7.75-1.832A11.94 11.94 0 0016 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm6.08 16.5c-.253.713-1.497 1.36-2.048 1.428-.523.065-1.188.092-1.916-.12a17.56 17.56 0 01-1.734-.643C14.035 19.085 12.17 17.2 11.4 15.8c-.398-.706-.414-1.32-.257-1.758.157-.437.525-.636.787-.664l.56-.013c.19-.004.44.071.686.54l.82 1.73c.08.17.04.37-.09.52l-.37.43c-.12.14-.13.32-.03.46.32.48.89 1.16 1.48 1.7.64.59 1.38 1.07 1.9 1.29.16.07.34.04.46-.08l.38-.42c.13-.14.31-.2.49-.16l1.8.43c.42.1.67.35.67.67v.5z"/>
@@ -694,16 +958,8 @@ export default function Landing() {
             {/* ══ ENQUIRE NOW FLOAT ══ */}
             <motion.a
                 href="/admissions"
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.94 }}
-                style={{
-                    position: 'fixed', bottom: 90, right: 20, zIndex: 998,
-                    padding: '10px 18px', borderRadius: 50,
-                    backgroundColor: '#C1440E',
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    boxShadow: '0 4px 18px rgba(193,68,14,0.45)',
-                    textDecoration: 'none',
-                }}
+                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 998, padding: '10px 18px', borderRadius: 50, backgroundColor: '#C1440E', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 18px rgba(193,68,14,0.45)', textDecoration: 'none' }}
             >
                 <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>🎓 Enquire Now</span>
             </motion.a>
