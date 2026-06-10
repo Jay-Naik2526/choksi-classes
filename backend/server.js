@@ -90,11 +90,7 @@ const authLimiter = rateLimit({
     max: 20,  // tighter on auth
     message: { message: 'Too many login attempts. Please wait 15 minutes.' },
 });
-const enquiryLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 10,  // max 10 enquiries per hour per IP
-    message: { message: 'Too many enquiries. Please call us directly.' },
-});
+// enquiryLimiter is defined inside enquiryRoutes.js — applied only to POST, not to Sir's GET reads
 
 app.use(globalLimiter);
 
@@ -120,7 +116,7 @@ app.use('/api/doubts',   require('./src/routes/doubtRoutes'));
 app.use('/api/tests',    require('./src/routes/testRoutes'));
 app.use('/api/homework', require('./src/routes/homeworkRoutes'));
 app.use('/api/push',     require('./src/routes/pushRoutes'));
-app.use('/api/enquiry',  enquiryLimiter, require('./src/routes/enquiryRoutes'));
+app.use('/api/enquiry',  require('./src/routes/enquiryRoutes'));
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV || 'development' }));

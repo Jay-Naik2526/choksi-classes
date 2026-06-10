@@ -9,9 +9,9 @@ import useAuthStore from '../../store/authStore';
 import api from '../../utils/api';
 
 const sirNav = [
-    { label: 'Home',      path: '/dashboard', Icon: Home },
+    { label: 'Home',      path: '/dashboard', Icon: Home,          badge: 'enquiry' },
     { label: 'Students',  path: '/students',  Icon: Users },
-    { label: 'Enquiries', path: '/enquiries', Icon: Inbox,  badge: 'enquiry' },
+    { label: 'Homework',  path: '/homework',  Icon: ClipboardList },
     { label: 'Tests',     path: '/tests',     Icon: FileText },
     { label: 'Materials', path: '/materials', Icon: BookOpen },
     { label: 'Profile',   path: '/profile',   Icon: User },
