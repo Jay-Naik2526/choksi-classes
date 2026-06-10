@@ -1,4 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+
+/* responsive hook */
+function useBreakpoint() {
+    const [w, setW] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+    useEffect(() => {
+        const fn = () => setW(window.innerWidth);
+        window.addEventListener('resize', fn);
+        return () => window.removeEventListener('resize', fn);
+    }, []);
+    return { isMobile: w < 640, isTablet: w < 1024, w };
+}
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion';
 import {
@@ -43,17 +54,29 @@ const STYLES = `
 .marquee-l { animation:marqueeL 22s linear infinite; }
 .marquee-r { animation:marqueeR 28s linear infinite; }
 
-.glass {
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.08);
+.glass { background:rgba(255,255,255,0.04); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); }
+.glass-light { background:rgba(255,255,255,0.7); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,0.5); }
+
+/* ── Responsive helpers ── */
+@media (max-width: 639px) {
+  .hide-mobile { display: none !important; }
+  .stat-grid   { grid-template-columns: repeat(2,1fr) !important; }
+  .bento-grid  { grid-template-columns: 1fr !important; }
+  .bento-large { grid-column: 1 !important; }
+  .cmp-grid    { grid-template-columns: 1fr 36px 36px !important; gap: 8px !important; }
+  .how-row     { flex-direction: column !important; align-items: stretch !important; }
+  .about-grid  { grid-template-columns: 1fr !important; }
+  .footer-row  { flex-direction: column !important; align-items: flex-start !important; }
+  .hero-nav    { padding: 16px !important; }
+  .hero-content{ padding: 24px 16px 100px !important; }
+  .section-pad { padding-left: 16px !important; padding-right: 16px !important; }
+  .cta-row     { flex-direction: column !important; align-items: stretch !important; }
+  .cta-row > * { width: 100% !important; justify-content: center !important; }
 }
-.glass-light {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.5);
+@media (min-width: 640px) and (max-width: 1023px) {
+  .bento-grid  { grid-template-columns: repeat(2,1fr) !important; }
+  .bento-large { grid-column: 1 / 3 !important; }
+  .stat-grid   { grid-template-columns: repeat(2,1fr) !important; }
 }
 `;
 
@@ -223,39 +246,55 @@ function StatCard({ value, isFixed, suffix, label, note, color, delay }) {
    PORTAL FEATURE BENTO CARD
 ──────────────────────────────────────────────── */
 function BentoCard({ feature, index }) {
-    const cardStyle = {
-        borderRadius: 22, overflow: 'hidden', height: '100%',
+    const pad = feature.large ? 32 : 24;
+    const baseCard = {
+        borderRadius: 20,
         border: '1px solid rgba(255,255,255,0.07)',
         background: 'rgba(255,255,255,0.03)',
         backdropFilter: 'blur(12px)',
+        width: '100%', height: '100%',
+        position: 'relative', overflow: 'hidden',
+        boxSizing: 'border-box',
+        display: 'flex', flexDirection: 'column',
+        padding: pad,
     };
     const front = (
-        <SpotlightCard spotColor={`${feature.color}20`} style={{ ...cardStyle, padding: feature.large ? 36 : 28, height: '100%' }}>
+        <SpotlightCard spotColor={`${feature.color}20`} style={baseCard}>
             <BorderBeam colorA={feature.color} colorB="#E8A020" duration={5 + index} />
-            <div style={{ width: feature.large ? 56 : 44, height: feature.large ? 56 : 44, borderRadius: feature.large ? 18 : 14, backgroundColor: feature.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: feature.large ? 22 : 16 }}>
-                <feature.icon size={feature.large ? 26 : 20} color={feature.color} />
+            {/* icon */}
+            <div style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: feature.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, flexShrink: 0 }}>
+                <feature.icon size={22} color={feature.color} />
             </div>
-            <p style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, color: '#F5F0E8', fontSize: feature.large ? 22 : 17, marginBottom: 8 }}>{feature.title}</p>
-            <p style={{ color: 'rgba(245,240,232,0.5)', fontSize: 13, lineHeight: 1.7, marginBottom: feature.large ? 20 : 14 }}>{feature.desc}</p>
+            {/* title */}
+            <p style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700, color: '#F5F0E8', fontSize: feature.large ? 20 : 16, marginBottom: 8, flexShrink: 0 }}>
+                {feature.title}
+            </p>
+            {/* desc */}
+            <p style={{ color: 'rgba(245,240,232,0.5)', fontSize: 12, lineHeight: 1.65, marginBottom: 14, flexShrink: 0 }}>
+                {feature.desc}
+            </p>
+            {/* pills */}
             {feature.items && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto' }}>
                     {feature.items.map((item, i) => (
-                        <span key={i} style={{ padding: '4px 10px', borderRadius: 50, backgroundColor: `${feature.color}18`, border: `1px solid ${feature.color}35`, color: feature.color, fontSize: 11, fontWeight: 600 }}>
+                        <span key={i} style={{ padding: '3px 9px', borderRadius: 50, backgroundColor: `${feature.color}18`, border: `1px solid ${feature.color}35`, color: feature.color, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {item}
                         </span>
                     ))}
+                    <span style={{ padding: '3px 8px', borderRadius: 50, color: 'rgba(255,255,255,0.2)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', alignSelf: 'center' }}>
+                        ↺ flip
+                    </span>
                 </div>
             )}
-            <p style={{ position: 'absolute', bottom: 14, right: 18, color: 'rgba(255,255,255,0.2)', fontSize: 10, letterSpacing: '0.08em' }}>HOVER TO FLIP →</p>
         </SpotlightCard>
     );
     const back = (
-        <div style={{ ...cardStyle, padding: feature.large ? 36 : 28, backgroundColor: feature.color, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', height: '100%' }}>
-            <feature.icon size={36} color="rgba(255,255,255,0.6)" style={{ marginBottom: 20 }} />
-            <p style={{ color: '#fff', fontSize: feature.large ? 17 : 14, lineHeight: 1.75, fontWeight: 500 }}>{feature.flip}</p>
+        <div style={{ ...baseCard, backgroundColor: feature.color, justifyContent: 'center', alignItems: 'center', textAlign: 'center', border: 'none' }}>
+            <feature.icon size={32} color="rgba(255,255,255,0.55)" style={{ marginBottom: 16 }} />
+            <p style={{ color: '#fff', fontSize: 13, lineHeight: 1.8, fontWeight: 500, maxWidth: 260 }}>{feature.flip}</p>
         </div>
     );
-    return <FlipCard front={front} back={back} height={feature.large ? 280 : 220} />;
+    return <FlipCard front={front} back={back} height={feature.large ? 300 : 240} style={{ height: '100%', minHeight: feature.large ? 260 : 210 }} />;
 }
 
 /* ────────────────────────────────────────────────
@@ -270,10 +309,11 @@ function CompareRow({ feature, us, them, index }) {
             initial={{ opacity: 0, x: -20 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: index * 0.06, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="cmp-grid"
             style={{
                 display: 'grid', gridTemplateColumns: '1fr auto auto',
                 alignItems: 'center', gap: 16,
-                padding: '14px 20px',
+                padding: '12px 20px',
                 borderRadius: 12,
                 backgroundColor: index % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent',
                 border: '1px solid rgba(255,255,255,0.04)',
@@ -308,6 +348,7 @@ function CompareRow({ feature, us, them, index }) {
 ──────────────────────────────────────────────── */
 export default function Landing() {
     const navigate = useNavigate();
+    const { isMobile, isTablet } = useBreakpoint();
     const heroRef = useRef(null);
     const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
     const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '25%']);
@@ -352,10 +393,10 @@ export default function Landing() {
                         }} />
                     ))}
 
-                    {/* rings */}
-                    <div className="animate-spin-slow" style={{ position: 'absolute', top: '7%', right: '5%', width: 190, height: 190, borderRadius: '50%', border: '1.5px dashed rgba(193,68,14,0.2)', pointerEvents: 'none', zIndex: 1 }} />
-                    <div className="animate-spin-slow-r" style={{ position: 'absolute', top: '7%', right: '5%', width: 148, height: 148, margin: '21px', borderRadius: '50%', border: '1.5px solid rgba(232,160,32,0.12)', pointerEvents: 'none', zIndex: 1 }} />
-                    <div style={{ position: 'absolute', top: '7%', right: '5%', width: 190, height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
+                    {/* rings — hidden on mobile */}
+                    <div className="animate-spin-slow hide-mobile" style={{ position: 'absolute', top: '7%', right: '5%', width: 190, height: 190, borderRadius: '50%', border: '1.5px dashed rgba(193,68,14,0.2)', pointerEvents: 'none', zIndex: 1 }} />
+                    <div className="animate-spin-slow-r hide-mobile" style={{ position: 'absolute', top: '7%', right: '5%', width: 148, height: 148, margin: '21px', borderRadius: '50%', border: '1.5px solid rgba(232,160,32,0.12)', pointerEvents: 'none', zIndex: 1 }} />
+                    <div className="hide-mobile" style={{ position: 'absolute', top: '7%', right: '5%', width: 190, height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
                         <div style={{ textAlign: 'center' }}>
                             <p style={{ color: '#E8A020', fontWeight: 800, fontSize: 23, lineHeight: 1 }}>4.7</p>
                             <p style={{ color: 'rgba(245,240,232,0.4)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 2 }}>Google</p>
@@ -367,10 +408,11 @@ export default function Landing() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1, duration: 0.6 }}
+                        className="hero-nav"
                         style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 32px' }}
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(193,68,14,0.28)', border: '1px solid rgba(193,68,14,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(193,68,14,0.28)', border: '1px solid rgba(193,68,14,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                 <span style={{ fontFamily: 'Playfair Display, serif', color: '#F5F0E8', fontWeight: 700, fontSize: 19 }}>C</span>
                             </div>
                             <span style={{ fontFamily: 'Playfair Display, serif', color: '#F5F0E8', fontWeight: 700, fontSize: 17 }}>Choksi Classes</span>
@@ -379,6 +421,7 @@ export default function Landing() {
                             <motion.button
                                 whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                                 onClick={() => navigate('/admissions')}
+                                className="hide-mobile"
                                 style={{ padding: '9px 18px', borderRadius: 12, backgroundColor: 'transparent', color: 'rgba(245,240,232,0.75)', fontSize: 13, fontWeight: 600, border: '1px solid rgba(245,240,232,0.18)', cursor: 'pointer' }}
                             >
                                 Enquire
@@ -391,7 +434,7 @@ export default function Landing() {
 
                     {/* HERO CONTENT */}
                     <motion.div style={{ y: heroY, opacity: heroOpacity }}>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px 120px', textAlign: 'center', position: 'relative', zIndex: 5 }}>
+                        <div className="hero-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px 120px', textAlign: 'center', position: 'relative', zIndex: 5 }}>
 
                             {/* badge */}
                             <motion.div
@@ -437,7 +480,8 @@ export default function Landing() {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 1.05, type: 'spring', stiffness: 220, damping: 24 }}
-                                style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}
+                                className="cta-row"
+                                style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', width: isMobile ? '100%' : 'auto', maxWidth: isMobile ? 320 : 'none' }}
                             >
                                 <MagneticButton
                                     onClick={() => navigate('/login')}
@@ -501,8 +545,8 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §3  STATS
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#150906', padding: '80px 0' }}>
-                    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
+                <section style={{ backgroundColor: '#150906', padding: '60px 0' }}>
+                    <div className="stat-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)' }}>
                         <StatCard value={37}  suffix="+"  label="Google Reviews"   note="37 happy students"   color="#C1440E" delay={0}    />
                         <StatCard value={4.7} suffix="★" label="Avg Rating"        note="Google & Justdial"   color="#E8A020" delay={0.08} isFixed />
                         <StatCard value={100} suffix="+"  label="Students Taught"  note="and counting"        color="#16a34a" delay={0.16} />
@@ -513,7 +557,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §4  NAVSARI'S FIRST PORTAL  ← NEW
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#0A0502', padding: '110px 24px', position: 'relative', overflow: 'hidden' }}>
+                <section className="section-pad" style={{ backgroundColor: '#0A0502', padding: '80px 24px', position: 'relative', overflow: 'hidden' }}>
                     <AuroraBackground colors={['#1a0a04', '#C1440E', '#0A0502']} opacity={0.12} />
                     <DotGrid color="rgba(193,68,14,0.04)" size={40} />
 
@@ -544,24 +588,24 @@ export default function Landing() {
                         </div>
 
                         {/* Bento Grid */}
-                        <StaggerContainer style={{
+                        <StaggerContainer className="bento-grid" style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, 1fr)',
-                            gap: 16,
+                            gap: 14,
                         }}>
                             {/* Large card — Student Portal */}
-                            <StaggerItem style={{ gridColumn: '1 / 3', height: 280 }}>
+                            <StaggerItem className="bento-large" style={{ gridColumn: '1 / 3', height: isMobile ? 'auto' : 300, minHeight: isMobile ? 260 : 300 }}>
                                 <BentoCard feature={PORTAL_FEATURES[0]} index={0} />
                             </StaggerItem>
 
                             {/* Parent Dashboard */}
-                            <StaggerItem style={{ height: 280 }}>
+                            <StaggerItem style={{ height: isMobile ? 'auto' : 300, minHeight: isMobile ? 240 : 300 }}>
                                 <BentoCard feature={PORTAL_FEATURES[1]} index={1} />
                             </StaggerItem>
 
                             {/* Row 2 — 3 equal cards */}
                             {PORTAL_FEATURES.slice(2).map((f, i) => (
-                                <StaggerItem key={f.title} style={{ height: 220 }}>
+                                <StaggerItem key={f.title} style={{ height: isMobile ? 'auto' : 240, minHeight: isMobile ? 210 : 240 }}>
                                     <BentoCard feature={f} index={i + 2} />
                                 </StaggerItem>
                             ))}
@@ -582,8 +626,8 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §5  ABOUT
                 ══════════════════════════════════════════════ */}
-                <section id="about" style={{ backgroundColor: '#F7F4EF', padding: '100px 24px' }}>
-                    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 64, alignItems: 'center' }}>
+                <section id="about" className="section-pad" style={{ backgroundColor: '#F7F4EF', padding: '80px 24px' }}>
+                    <div className="about-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: isMobile ? 40 : 64, alignItems: 'center' }}>
 
                         <FadeUp>
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 16 }}>◆ About Us</p>
@@ -636,7 +680,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §6  COURSES
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#FFFFFF', padding: '100px 24px' }}>
+                <section className="section-pad" style={{ backgroundColor: '#FFFFFF', padding: '80px 24px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
                         <FadeUp style={{ textAlign: 'center', marginBottom: 64 }}>
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 14 }}>Our Courses</p>
@@ -671,25 +715,25 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §7  HOW IT WORKS  ← NEW
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#F7F4EF', padding: '100px 24px' }}>
+                <section className="section-pad" style={{ backgroundColor: '#F7F4EF', padding: '80px 24px' }}>
                     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-                        <FadeUp style={{ textAlign: 'center', marginBottom: 72 }}>
+                        <FadeUp style={{ textAlign: 'center', marginBottom: 64 }}>
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 14 }}>Simple Process</p>
-                            <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 900, color: '#2C1810' }}>
+                            <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(28px,5vw,52px)', fontWeight: 900, color: '#2C1810' }}>
                                 Join in{' '}
                                 <LetterReveal style={{ color: '#C1440E', fontStyle: 'italic' }}>3 Easy Steps</LetterReveal>
                             </h2>
                         </FadeUp>
 
                         {/* Steps row */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <div className="how-row" style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 16 : 0 }}>
                             {HOW_STEPS.map((step, i) => (
                                 <>
-                                    <FadeUp key={step.num} delay={i * 0.15} style={{ flex: '1 1 220px', maxWidth: 280 }}>
+                                    <FadeUp key={step.num} delay={i * 0.15} style={{ flex: '1 1 200px' }}>
                                         <GlowCard glowColor={`${step.color}30`}>
                                             <SpotlightCard
                                                 spotColor={`${step.color}14`}
-                                                style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32, border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 4px 20px rgba(44,24,16,0.06)', textAlign: 'center', position: 'relative', overflow: 'hidden' }}
+                                                style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: isMobile ? 24 : 32, border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 4px 20px rgba(44,24,16,0.06)', textAlign: isMobile ? 'left' : 'center', position: 'relative', overflow: 'hidden', display: isMobile ? 'flex' : 'block', alignItems: 'center', gap: isMobile ? 20 : 0 }}
                                             >
                                                 <BorderBeam colorA={step.color} colorB="#E8A020" duration={4 + i} />
                                                 <motion.div
@@ -697,17 +741,19 @@ export default function Landing() {
                                                     whileInView={{ scale: 1, rotate: 0 }}
                                                     transition={{ type: 'spring', stiffness: 260, damping: 20, delay: i * 0.12 }}
                                                     viewport={{ once: true }}
-                                                    style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: `${step.color}15`, border: `2px solid ${step.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}
+                                                    style={{ width: isMobile ? 52 : 64, height: isMobile ? 52 : 64, borderRadius: '50%', backgroundColor: `${step.color}15`, border: `2px solid ${step.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: isMobile ? '0' : '0 auto 20px', flexShrink: 0 }}
                                                 >
-                                                    <step.icon size={28} color={step.color} />
+                                                    <step.icon size={isMobile ? 22 : 28} color={step.color} />
                                                 </motion.div>
-                                                <p style={{ fontFamily: 'Playfair Display, serif', fontSize: 13, fontWeight: 700, color: step.color, letterSpacing: '0.15em', marginBottom: 8 }}>{step.num}</p>
-                                                <p style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, fontWeight: 700, color: '#2C1810', marginBottom: 12 }}>{step.title}</p>
-                                                <p style={{ color: 'rgba(44,24,16,0.6)', fontSize: 14, lineHeight: 1.7 }}>{step.desc}</p>
+                                                <div>
+                                                    <p style={{ fontFamily: 'Playfair Display, serif', fontSize: 11, fontWeight: 700, color: step.color, letterSpacing: '0.15em', marginBottom: 4 }}>{step.num}</p>
+                                                    <p style={{ fontFamily: 'Playfair Display, serif', fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#2C1810', marginBottom: 8 }}>{step.title}</p>
+                                                    <p style={{ color: 'rgba(44,24,16,0.6)', fontSize: 13, lineHeight: 1.7 }}>{step.desc}</p>
+                                                </div>
                                             </SpotlightCard>
                                         </GlowCard>
                                     </FadeUp>
-                                    {i < HOW_STEPS.length - 1 && (
+                                    {i < HOW_STEPS.length - 1 && !isMobile && (
                                         <div key={`beam-${i}`} style={{ flex: '0 0 48px', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
                                             <BeamLine color="#C1440E" style={{ minWidth: 40 }} />
                                         </div>
@@ -721,7 +767,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §8  COMPARISON TABLE  ← NEW
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#0D0603', padding: '110px 24px', position: 'relative', overflow: 'hidden' }}>
+                <section className="section-pad" style={{ backgroundColor: '#0D0603', padding: '80px 24px', position: 'relative', overflow: 'hidden' }}>
                     <AuroraBackground colors={['#1a0a04','#C1440E','#0D0603']} opacity={0.1} />
                     <DotGrid color="rgba(193,68,14,0.04)" size={38} />
                     <RetroGrid opacity={0.28} bgColor="#0D0603" />
@@ -742,10 +788,10 @@ export default function Landing() {
 
                         {/* Table header */}
                         <FadeUp delay={0.1}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, padding: '10px 20px 16px', marginBottom: 4 }}>
-                                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 12, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Feature</span>
-                                <span style={{ color: '#E8A020', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', minWidth: 90 }}>Choksi Classes</span>
-                                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', minWidth: 90 }}>Others in Navsari</span>
+                            <div className="cmp-grid" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, padding: '10px 20px 16px', marginBottom: 4 }}>
+                                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Feature</span>
+                                <span style={{ color: '#E8A020', fontSize: isMobile ? 9 : 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'center', minWidth: isMobile ? 36 : 90 }}>{isMobile ? 'Us' : 'Choksi Classes'}</span>
+                                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: isMobile ? 9 : 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'center', minWidth: isMobile ? 36 : 90 }}>{isMobile ? 'Others' : 'Others in Navsari'}</span>
                             </div>
 
                             <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)', padding: '8px 0' }}>
@@ -769,7 +815,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §9  TESTIMONIALS
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#150906', padding: '100px 0', overflow: 'hidden' }}>
+                <section style={{ backgroundColor: '#150906', padding: '80px 0', overflow: 'hidden' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
                         <FadeUp style={{ textAlign: 'center', marginBottom: 64 }}>
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 14 }}>Reviews</p>
@@ -807,7 +853,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §10  BIG CTA
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#C1440E', padding: '100px 24px', position: 'relative', overflow: 'hidden' }}>
+                <section className="section-pad" style={{ backgroundColor: '#C1440E', padding: '80px 24px', position: 'relative', overflow: 'hidden' }}>
                     <AuroraBackground colors={['#a0360b','#E8A020','#7a2a08']} opacity={0.2} />
                     <DotGrid color="rgba(255,255,255,0.08)" size={30} />
                     <div style={{ position: 'absolute', top: '-30%', right: '-10%', width: 500, height: 500, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
@@ -826,7 +872,7 @@ export default function Landing() {
                         <p style={{ color: 'rgba(255,255,255,0.72)', fontSize: 17, lineHeight: 1.7, marginBottom: 44 }}>
                             Std 1–10 (CBSE &amp; GSEB) · Std 11–12 Commerce — with daily tests, small batches, and a 24-hour helpline. 20+ years of proven results. Navsari's only digital coaching portal.
                         </p>
-                        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <div className="cta-row" style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
                             <RippleButton
                                 onClick={() => navigate('/admissions')}
                                 style={{ padding: '16px 40px', borderRadius: 16, backgroundColor: '#FFFFFF', color: '#C1440E', fontSize: 15, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 40px rgba(44,24,16,0.3)', cursor: 'pointer' }}
@@ -846,7 +892,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §11  CONTACT CARDS
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#F7F4EF', padding: '80px 24px' }}>
+                <section className="section-pad" style={{ backgroundColor: '#F7F4EF', padding: '80px 24px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
                         <FadeUp style={{ textAlign: 'center', marginBottom: 48 }}>
                             <p style={{ color: '#C1440E', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>Get In Touch</p>
@@ -885,7 +931,7 @@ export default function Landing() {
                 {/* ══════════════════════════════════════════════
                     §12  GOOGLE MAPS
                 ══════════════════════════════════════════════ */}
-                <section style={{ backgroundColor: '#F7F4EF', padding: '0 24px 80px' }}>
+                <section className="section-pad" style={{ backgroundColor: '#F7F4EF', padding: '0 24px 80px' }}>
                     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
                         <FadeUp>
                             <div style={{ borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(44,24,16,0.08)', boxShadow: '0 8px 40px rgba(44,24,16,0.08)', position: 'relative' }}>
@@ -912,7 +958,7 @@ export default function Landing() {
                 ══════════════════════════════════════════════ */}
                 <footer style={{ backgroundColor: '#0D0603', padding: '48px 24px 32px', borderTop: '1px solid rgba(193,68,14,0.12)', position: 'relative', overflow: 'hidden' }}>
                     <DotGrid color="rgba(193,68,14,0.05)" size={30} />
-                    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 24, position: 'relative', zIndex: 1 }}>
+                    <div className="footer-row" style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 20, position: 'relative', zIndex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(193,68,14,0.28)', border: '1px solid rgba(193,68,14,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <span style={{ fontFamily: 'Playfair Display, serif', color: '#F5F0E8', fontWeight: 700, fontSize: 17 }}>C</span>
