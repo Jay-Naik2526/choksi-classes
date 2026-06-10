@@ -1,51 +1,56 @@
-const sendEmail = require('../utils/sendEmail');
+const Enquiry = require('../models/Enquiry');
 
-// POST /api/enquiry  (public — no auth)
+/* ── POST /api/enquiry  (public) ──────────────────────────────────────────
+   Save the submission to DB. No email — Sir sees it in the portal. */
 exports.submitEnquiry = async (req, res) => {
     try {
         const { parentName, childName, className, board, phone, message } = req.body;
         if (!parentName || !phone)
             return res.status(400).json({ message: 'Parent name and phone number are required.' });
 
-        const rows = [
-            ['Parent Name',  parentName],
-            ["Child's Name", childName  || '—'],
-            ['Class',        className  || '—'],
-            ['Board',        board      || '—'],
-            ['Phone',        phone],
-            ['Message',      message    || '—'],
-        ];
-
-        const tableRows = rows.map(([k, v], i) => `
-            <tr style="background:${i % 2 === 0 ? '#fff' : '#F5F0E8'}">
-                <td style="padding:10px 14px;font-weight:600;color:#2C1810;width:140px;font-size:13px">${k}</td>
-                <td style="padding:10px 14px;color:${k === 'Phone' ? '#C1440E' : '#555'};font-size:13px;font-weight:${k === 'Phone' ? '700' : '400'}">${v}</td>
-            </tr>`).join('');
-
-        const html = `
-<div style="font-family:sans-serif;max-width:540px;margin:auto">
-  <div style="background:#2C1810;padding:28px 24px;border-radius:12px 12px 0 0;text-align:center">
-    <h2 style="color:#F5F0E8;margin:0;font-family:Georgia,serif;font-size:22px">Choksi Classes</h2>
-    <p style="color:#E8A020;margin:6px 0 0;font-size:13px;letter-spacing:.05em">NEW ADMISSION ENQUIRY</p>
-  </div>
-  <div style="background:#fff;border-radius:0 0 12px 12px;border:1px solid #e8e0d5;border-top:none;overflow:hidden">
-    <table style="width:100%;border-collapse:collapse">${tableRows}</table>
-    <div style="padding:18px 14px;background:#FFF8F5;border-top:1px solid #f0e8e0">
-      <p style="margin:0;color:#888;font-size:11px">Sent via Choksi Classes admissions form · ${new Date().toLocaleString('en-IN')}</p>
-    </div>
-  </div>
-</div>`;
-
-        // Send to both owners
-        await sendEmail({
-            to: 'dipchoksi@hotmail.com, kairavichoksi@yahoo.com',
-            subject: `📋 New Enquiry — ${parentName} (${childName || 'Child'}, ${className || 'Std ?'}, ${board || 'Board ?'})`,
-            html,
-        });
+        await Enquiry.create({ parentName, childName, className, board, phone, message });
 
         res.json({ message: 'Enquiry sent successfully! We will contact you within 24 hours.' });
     } catch (err) {
-        console.error('Enquiry email error:', err.message);
-        res.status(500).json({ message: 'Could not send enquiry. Please call us directly.' });
+        console.error('Enquiry error:', err.message);
+        res.status(500).json({ message: 'Could not save enquiry. Please call us directly.' });
+    }
+};
+
+/* ── GET /api/enquiry  (sir only) ─────────────────────────────────────── */
+exports.listEnquiries = async (req, res) => {
+    try {
+        const { status } = req.query;          // optional filter
+        const filter = status && status !== 'all' ? { status } : {};
+        const enquiries = await Enquiry.find(filter).sort({ createdAt: -1 });
+        const newCount  = await Enquiry.countDocuments({ status: 'new' });
+        res.json({ enquiries, newCount });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+/* ── PATCH /api/enquiry/:id  (sir only) ────────────────────────────────── */
+exports.updateEnquiry = async (req, res) => {
+    try {
+        const { status, note } = req.body;
+        const update = {};
+        if (status) update.status = status;
+        if (note !== undefined) update.note = note;
+        const enquiry = await Enquiry.findByIdAndUpdate(req.params.id, update, { new: true });
+        if (!enquiry) return res.status(404).json({ message: 'Enquiry not found' });
+        res.json({ enquiry });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+/* ── DELETE /api/enquiry/:id  (sir only) ────────────────────────────────── */
+exports.deleteEnquiry = async (req, res) => {
+    try {
+        await Enquiry.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 };

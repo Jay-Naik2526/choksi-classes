@@ -29,6 +29,7 @@ const CreateHomework = lazy(() => import('./pages/homework/CreateHomework'));
 const HomeworkDetail = lazy(() => import('./pages/homework/HomeworkDetail'));
 const BatchManagement = lazy(() => import('./pages/batches/BatchManagement'));
 const ReferralTracker = lazy(() => import('./pages/students/ReferralTracker'));
+const EnquiryList     = lazy(() => import('./pages/enquiries/EnquiryList'));
 
 const PrivateRoute = ({ children }) => {
     const { token } = useAuthStore();
@@ -82,6 +83,9 @@ function App() {
 
                     {/* Referrals */}
                     <Route path="/referrals" element={<PrivateRoute><ReferralTracker /></PrivateRoute>} />
+
+                    {/* Enquiries inbox — sir only */}
+                    <Route path="/enquiries" element={<PrivateRoute><EnquiryList /></PrivateRoute>} />
 
                     {/* Public */}
                     <Route path="/admissions" element={<Admissions />} />
