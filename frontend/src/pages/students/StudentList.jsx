@@ -1,12 +1,61 @@
 import { useEffect, useState } from 'react';
 import {
     Plus, Search, Users, BookOpen, UserCheck, ChevronDown, ChevronUp,
-    Edit2, Trash2, UserX, UserPlus, X, Check, Mail, Phone, Hash, FileDown
+    Edit2, Trash2, UserX, UserPlus, X, Check, Mail, Phone, Hash, FileDown, Upload, AlertCircle
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import PageHeader from '../../components/layout/PageHeader';
 import { PageLoader } from '../../components/ui/Spinner';
 import api from '../../utils/api';
+
+// ─── CSV helpers (no external dependency) ────────────────────────────────────
+// RFC-style parser: handles quoted fields, escaped quotes, commas & newlines.
+function parseCSV(text) {
+    const rows = [];
+    let field = '', record = [], inQuotes = false;
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+            if (c === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else inQuotes = false;
+            } else field += c;
+        } else if (c === '"') inQuotes = true;
+        else if (c === ',') { record.push(field); field = ''; }
+        else if (c === '\n') { record.push(field); rows.push(record); record = []; field = ''; }
+        else field += c;
+    }
+    if (field.length > 0 || record.length > 0) { record.push(field); rows.push(record); }
+    return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+// Map common header spellings → canonical keys the API expects
+const HEADER_MAP = {
+    'name': 'name', 'full name': 'name', 'student name': 'name',
+    'email': 'email', 'email address': 'email',
+    'password': 'password', 'temp password': 'password',
+    'phone': 'phone', 'mobile': 'phone', 'phone number': 'phone', 'contact': 'phone',
+    'roll': 'rollNumber', 'roll number': 'rollNumber', 'rollnumber': 'rollNumber', 'roll no': 'rollNumber',
+    'address': 'address',
+    'batch': 'batches', 'batches': 'batches', 'batch name': 'batches', 'batch names': 'batches',
+};
+
+function csvToStudents(text) {
+    const rows = parseCSV(text);
+    if (rows.length < 2) return [];
+    const headers = rows[0].map(h => HEADER_MAP[h.trim().toLowerCase()] || null);
+    return rows.slice(1).map(cols => {
+        const obj = {};
+        headers.forEach((key, i) => { if (key) obj[key] = (cols[i] || '').trim(); });
+        return obj;
+    });
+}
+
+const CSV_TEMPLATE =
+    'name,email,password,phone,rollNumber,address,batches\n' +
+    'Ravi Patel,ravi@example.com,changeme123,9876543210,42,Navsari,"Science Batch A;Maths"\n' +
+    'Priya Shah,priya@example.com,changeme123,9876500000,43,Bilimora,Science Batch A\n';
 
 // ─── Reusable field ──────────────────────────────────────────────────────────
 const Field = ({ label, type = 'text', value, onChange, required, placeholder, children }) => (
@@ -61,6 +110,66 @@ function StudentsTab({ students, batches, parents, onRefresh }) {
     const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', rollNumber: '', batchIds: [], address: '' });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+
+    // Bulk import
+    const [showImport, setShowImport] = useState(false);
+    const [importRows, setImportRows] = useState([]);
+    const [importFileName, setImportFileName] = useState('');
+    const [importError, setImportError] = useState('');
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState(null);
+
+    const resetImport = () => {
+        setImportRows([]); setImportFileName(''); setImportError('');
+        setImporting(false); setImportResult(null);
+    };
+
+    const handleImportFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImportError(''); setImportResult(null);
+        setImportFileName(file.name);
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const rows = csvToStudents(String(reader.result));
+                const valid = rows.filter(r => r.name || r.email);
+                if (valid.length === 0) {
+                    setImportError('No rows found. Check the header row matches the template.');
+                    setImportRows([]);
+                } else {
+                    setImportRows(valid);
+                }
+            } catch (_) {
+                setImportError('Could not read this CSV file.');
+                setImportRows([]);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // allow re-selecting the same file
+    };
+
+    const downloadTemplate = () => {
+        const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'student-import-template.csv'; a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleImport = async () => {
+        if (importRows.length === 0) return;
+        setImporting(true); setImportError('');
+        try {
+            const res = await api.post('/users/students/bulk-import', { students: importRows });
+            setImportResult(res.data);
+            await onRefresh();
+        } catch (err) {
+            setImportError(err.response?.data?.message || 'Import failed');
+        } finally {
+            setImporting(false);
+        }
+    };
 
     const filtered = students.filter(s => {
         const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -133,6 +242,12 @@ function StudentsTab({ students, batches, parents, onRefresh }) {
                         className="flex-1 text-sm outline-none bg-transparent"
                         style={{ color: '#2C1810' }} />
                 </div>
+                <button onClick={() => { resetImport(); setShowImport(true); }}
+                    className="flex items-center justify-center px-3 py-2.5 rounded-xl flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(193,68,14,0.08)', color: '#C1440E' }}
+                    title="Import students from CSV">
+                    <Upload size={15} />
+                </button>
                 <button onClick={openAdd}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold flex-shrink-0"
                     style={{ backgroundColor: '#C1440E', color: '#F5F0E8' }}>
@@ -313,6 +428,108 @@ function StudentsTab({ students, batches, parents, onRefresh }) {
                         </p>
                     )}
                 </form>
+            </Sheet>
+
+            {/* Bulk import Sheet */}
+            <Sheet open={showImport} onClose={() => setShowImport(false)} title="Import Students (CSV)">
+                {importResult ? (
+                    // ── Results summary ──
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-2xl p-4 text-center" style={{ backgroundColor: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)' }}>
+                                <p className="font-bold" style={{ fontFamily: 'Playfair Display, serif', color: '#16a34a', fontSize: 26 }}>{importResult.created}</p>
+                                <p className="text-xs font-medium" style={{ color: '#2C1810' }}>Created</p>
+                            </div>
+                            <div className="rounded-2xl p-4 text-center" style={{ backgroundColor: 'rgba(232,160,32,0.1)', border: '1px solid rgba(232,160,32,0.25)' }}>
+                                <p className="font-bold" style={{ fontFamily: 'Playfair Display, serif', color: '#b45309', fontSize: 26 }}>{importResult.skipped}</p>
+                                <p className="text-xs font-medium" style={{ color: '#2C1810' }}>Skipped</p>
+                            </div>
+                        </div>
+                        {importResult.errors?.length > 0 && (
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#2C1810', opacity: 0.6 }}>
+                                    {importResult.errors.length} row(s) needed attention
+                                </p>
+                                <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                                    {importResult.errors.map((e, i) => (
+                                        <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: '#FEF2F2' }}>
+                                            <AlertCircle size={13} color="#C1440E" className="flex-shrink-0 mt-0.5" />
+                                            <p className="text-xs" style={{ color: '#2C1810' }}>
+                                                <strong>Row {e.row}</strong> ({e.email}): {e.reason}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <button onClick={() => setShowImport(false)}
+                            className="w-full py-3 rounded-xl font-semibold text-sm"
+                            style={{ backgroundColor: '#C1440E', color: '#F5F0E8' }}>
+                            Done
+                        </button>
+                    </div>
+                ) : (
+                    // ── Upload + preview ──
+                    <div className="space-y-4">
+                        <div className="rounded-xl p-3" style={{ backgroundColor: '#F7F4EF', border: '1px solid rgba(193,68,14,0.1)' }}>
+                            <p className="text-xs" style={{ color: '#2C1810', opacity: 0.7 }}>
+                                Upload a CSV with columns: <strong>name, email, password</strong> (required), and optional phone, rollNumber, address, batches.
+                                Use <strong>;</strong> to separate multiple batch names. Existing emails are skipped.
+                            </p>
+                            <button onClick={downloadTemplate}
+                                className="flex items-center gap-1.5 mt-2.5 text-xs font-semibold" style={{ color: '#C1440E' }}>
+                                <FileDown size={13} /> Download template
+                            </button>
+                        </div>
+
+                        <label className="flex flex-col items-center justify-center gap-2 py-7 rounded-2xl cursor-pointer transition-all"
+                            style={{ border: '2px dashed rgba(193,68,14,0.3)', backgroundColor: 'rgba(193,68,14,0.03)' }}>
+                            <Upload size={22} color="#C1440E" />
+                            <span className="text-sm font-medium" style={{ color: '#2C1810' }}>
+                                {importFileName || 'Choose CSV file'}
+                            </span>
+                            <input type="file" accept=".csv,text/csv" onChange={handleImportFile} className="hidden" />
+                        </label>
+
+                        {importError && (
+                            <p className="text-xs py-2 px-3 text-center rounded-xl" style={{ backgroundColor: '#FEF2F2', color: '#C1440E' }}>{importError}</p>
+                        )}
+
+                        {importRows.length > 0 && (
+                            <div>
+                                <p className="text-xs font-semibold mb-2" style={{ color: '#2C1810' }}>
+                                    {importRows.length} student{importRows.length !== 1 ? 's' : ''} ready · preview
+                                </p>
+                                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(44,24,16,0.08)' }}>
+                                    {importRows.slice(0, 5).map((r, i) => (
+                                        <div key={i} className="flex items-center gap-2 px-3 py-2"
+                                            style={{ backgroundColor: i % 2 ? '#F7F4EF' : '#FFFFFF' }}>
+                                            <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                                style={{ backgroundColor: 'rgba(193,68,14,0.1)', color: '#C1440E' }}>
+                                                {r.name?.[0]?.toUpperCase() || '?'}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-semibold truncate" style={{ color: '#2C1810' }}>{r.name || '(no name)'}</p>
+                                                <p className="text-xs truncate" style={{ color: '#2C1810', opacity: 0.45 }}>{r.email || '(no email)'}</p>
+                                            </div>
+                                            {r.batches && <span className="text-xs flex-shrink-0" style={{ color: '#C1440E', opacity: 0.7 }}>{r.batches}</span>}
+                                        </div>
+                                    ))}
+                                    {importRows.length > 5 && (
+                                        <div className="px-3 py-2 text-center text-xs" style={{ color: '#2C1810', opacity: 0.45, backgroundColor: '#FFFFFF' }}>
+                                            + {importRows.length - 5} more
+                                        </div>
+                                    )}
+                                </div>
+                                <button onClick={handleImport} disabled={importing}
+                                    className="w-full py-3 rounded-xl font-semibold text-sm mt-3"
+                                    style={{ backgroundColor: '#C1440E', color: '#F5F0E8', opacity: importing ? 0.6 : 1 }}>
+                                    {importing ? 'Importing…' : `Import ${importRows.length} student${importRows.length !== 1 ? 's' : ''}`}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </Sheet>
         </div>
     );

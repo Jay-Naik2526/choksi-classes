@@ -11,8 +11,10 @@ router.get('/my-children', protect, authorize('parent'), ctrl.getMyChildren);
 // Students
 router.get('/students', protect, authorize('sir'), ctrl.getStudents);
 router.post('/students', protect, authorize('sir'), ctrl.createStudent);
+router.post('/students/bulk-import', protect, authorize('sir'), ctrl.bulkImportStudents);
 router.patch('/students/:id', protect, authorize('sir'), ctrl.updateStudent);
 router.get('/students/:id/progress-report', protect, authorize('sir', 'parent', 'student'), ctrl.generateProgressReport);
+router.get('/students/:id/analytics', protect, authorize('sir', 'parent', 'student'), ctrl.getStudentAnalytics);
 
 // Sirs/Admins
 router.get('/sirs', protect, authorize('sir'), ctrl.getSirs);

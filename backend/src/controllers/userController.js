@@ -176,6 +176,182 @@ exports.getStudents = async (req, res) => {
     }
 };
 
+// POST /api/users/students/bulk-import — Sir: create many students from parsed CSV rows
+exports.bulkImportStudents = async (req, res) => {
+    try {
+        const { students } = req.body;
+        if (!Array.isArray(students) || students.length === 0)
+            return res.status(400).json({ message: 'No student rows provided' });
+        if (students.length > 500)
+            return res.status(400).json({ message: 'Too many rows (max 500 per import)' });
+
+        // Resolve batch names → ids once (case-insensitive)
+        const batches = await Batch.find().select('name').lean();
+        const batchByName = {};
+        batches.forEach(b => { if (b.name) batchByName[b.name.trim().toLowerCase()] = b._id; });
+
+        const results = { created: 0, skipped: 0, errors: [] };
+        const emailsSeen = new Set();
+
+        for (let i = 0; i < students.length; i++) {
+            const row = students[i] || {};
+            const rowNum = i + 1;
+            const name = (row.name || '').trim();
+            const email = (row.email || '').trim().toLowerCase();
+            const password = (row.password || '').toString().trim();
+            try {
+                if (!name || !email || !password) {
+                    results.errors.push({ row: rowNum, email: email || '(blank)', reason: 'Missing name, email or password' });
+                    continue;
+                }
+                if (password.length < 8) {
+                    results.errors.push({ row: rowNum, email, reason: 'Password must be at least 8 characters' });
+                    continue;
+                }
+                if (emailsSeen.has(email)) {
+                    results.errors.push({ row: rowNum, email, reason: 'Duplicate email within file' });
+                    continue;
+                }
+                emailsSeen.add(email);
+
+                const exists = await User.findOne({ email });
+                if (exists) {
+                    results.skipped++;
+                    results.errors.push({ row: rowNum, email, reason: 'Email already registered (skipped)' });
+                    continue;
+                }
+
+                // Resolve batch names (semicolon or comma separated)
+                const batchIds = [];
+                if (row.batches) {
+                    String(row.batches).split(/[;,]/).map(s => s.trim()).filter(Boolean).forEach(nm => {
+                        const id = batchByName[nm.toLowerCase()];
+                        if (id) batchIds.push(id);
+                    });
+                }
+
+                const student = await User.create({
+                    name, email, password,
+                    phone: (row.phone || '').toString().trim(),
+                    rollNumber: (row.rollNumber || '').toString().trim(),
+                    address: (row.address || '').toString().trim(),
+                    batchIds,
+                    role: 'student',
+                });
+
+                if (batchIds.length) {
+                    await Batch.updateMany({ _id: { $in: batchIds } }, { $addToSet: { students: student._id } });
+                }
+
+                try {
+                    await sendEmail({
+                        to: email,
+                        subject: 'Choksi Classes — Your student account is ready',
+                        html: welcomeEmail({ name, email, password, role: 'Student' }),
+                    });
+                } catch (_) { /* email best-effort */ }
+
+                results.created++;
+            } catch (e) {
+                results.errors.push({
+                    row: rowNum,
+                    email: email || '(blank)',
+                    reason: e.code === 11000 ? 'Email already registered' : 'Failed to create',
+                });
+            }
+        }
+
+        res.json({ message: `Imported ${results.created}, skipped ${results.skipped}`, ...results });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error: ' + err.message });
+    }
+};
+
+// GET /api/users/students/:id/analytics — performance analytics (sir/parent/student)
+exports.getStudentAnalytics = async (req, res) => {
+    try {
+        const student = await User.findById(req.params.id).select('name role');
+        if (!student || student.role !== 'student')
+            return res.status(404).json({ message: 'Student not found' });
+
+        // Access control mirrors the progress report
+        const { role, _id } = req.user;
+        if (role === 'student' && String(_id) !== String(student._id))
+            return res.status(403).json({ message: 'Access denied' });
+        if (role === 'parent') {
+            const parent = await User.findById(_id).select('childIds').lean();
+            const isChild = parent.childIds?.some(c => String(c) === String(student._id));
+            if (!isChild) return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const attempts = await Attempt.find({ studentId: student._id, status: { $in: ['submitted', 'graded'] } })
+            .populate('testId', 'name subject totalMarks')
+            .sort({ submittedAt: 1 })
+            .lean();
+
+        // Class average percentage per test (across all students who attempted it)
+        const testObjectIds = attempts.map(a => a.testId?._id).filter(Boolean);
+        const classAggs = await Attempt.aggregate([
+            { $match: { testId: { $in: testObjectIds }, status: { $in: ['submitted', 'graded'] } } },
+            { $group: { _id: '$testId', avg: { $avg: '$percentage' } } },
+        ]);
+        const classAvgMap = {};
+        classAggs.forEach(c => { classAvgMap[String(c._id)] = Math.round(c.avg); });
+
+        const trend = attempts.map(a => ({
+            name: a.testId?.name || 'Test',
+            subject: a.testId?.subject || '',
+            percentage: a.percentage ?? 0,
+            score: a.score ?? 0,
+            totalMarks: a.testId?.totalMarks ?? 0,
+            date: a.submittedAt,
+            classAvg: classAvgMap[String(a.testId?._id)] ?? null,
+        }));
+
+        // Subject-wise strengths / weaknesses
+        const subjMap = {};
+        trend.forEach(t => {
+            const s = t.subject || 'General';
+            if (!subjMap[s]) subjMap[s] = { subject: s, total: 0, count: 0, best: 0, worst: 100 };
+            subjMap[s].total += t.percentage;
+            subjMap[s].count += 1;
+            subjMap[s].best = Math.max(subjMap[s].best, t.percentage);
+            subjMap[s].worst = Math.min(subjMap[s].worst, t.percentage);
+        });
+        const subjects = Object.values(subjMap).map(s => ({
+            subject: s.subject,
+            avgPercentage: Math.round(s.total / s.count),
+            testsCount: s.count,
+            best: s.best,
+            worst: s.count ? s.worst : 0,
+        })).sort((a, b) => b.avgPercentage - a.avgPercentage);
+
+        const testsTaken = trend.length;
+        const avgScore = testsTaken ? Math.round(trend.reduce((s, t) => s + t.percentage, 0) / testsTaken) : 0;
+        const bestScore = testsTaken ? Math.max(...trend.map(t => t.percentage)) : 0;
+
+        // Direction: last up-to-3 tests vs the 3 before them
+        let recentTrend = 'flat';
+        if (testsTaken >= 2) {
+            const last = trend.slice(-3);
+            const prev = trend.slice(-6, -3);
+            const lastAvg = last.reduce((s, t) => s + t.percentage, 0) / last.length;
+            const prevAvg = prev.length ? prev.reduce((s, t) => s + t.percentage, 0) / prev.length : lastAvg;
+            if (lastAvg - prevAvg > 3) recentTrend = 'up';
+            else if (prevAvg - lastAvg > 3) recentTrend = 'down';
+        }
+
+        res.json({
+            studentName: student.name,
+            overall: { testsTaken, avgScore, bestScore, recentTrend },
+            trend,
+            subjects,
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 // POST /api/users/students — Sir: create student
 exports.createStudent = async (req, res) => {
     try {

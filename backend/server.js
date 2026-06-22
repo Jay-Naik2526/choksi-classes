@@ -34,6 +34,11 @@ connectDB().then(async () => {
         if (result.modifiedCount > 0)
             console.log(`✓ Marked ${result.modifiedCount} fee(s) as overdue.`);
     } catch (e) { console.error('Overdue update failed:', e.message); }
+
+    // Schedule the daily birthday-greeting job
+    try {
+        require('./src/utils/birthdayJob').scheduleBirthdayJob();
+    } catch (e) { console.error('Birthday job scheduling failed:', e.message); }
 });
 
 const app    = express();

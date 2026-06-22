@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema({
     batchIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Batch' }],
     dateOfBirth: { type: Date },
     address: { type: String },
+    lastBirthdayGreetYear: { type: Number }, // year we last sent a birthday greeting (idempotency)
     // Parent-specific
     childIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     // Profile

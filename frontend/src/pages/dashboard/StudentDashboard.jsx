@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, HelpCircle, BookOpen, ChevronRight, Play, Video, StickyNote, Clock } from 'lucide-react';
+import { FileText, HelpCircle, BookOpen, ChevronRight, Play, Video, StickyNote, Clock, BarChart3 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { PageLoader } from '../../components/ui/Spinner';
 import {
@@ -351,13 +351,14 @@ export default function StudentDashboard() {
 
                 {/* ── QUICK LINKS ── */}
                 <motion.div
-                    className="px-5 mt-3 grid grid-cols-3 gap-3"
+                    className="px-5 mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.55 }}
                 >
                     {[
                         { label: 'All Tests',  icon: FileText,   path: '/tests',     color: '#C1440E' },
+                        { label: 'Analytics', icon: BarChart3,   path: '/analytics', color: '#E8A020' },
                         { label: 'My Doubts', icon: HelpCircle,  path: '/doubts',    color: '#2563eb' },
                         { label: 'Materials', icon: BookOpen,    path: '/materials', color: '#059669' },
                     ].map(({ label, icon: Icon, path, color }) => (

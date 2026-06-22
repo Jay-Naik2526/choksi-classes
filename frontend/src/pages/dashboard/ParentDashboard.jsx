@@ -285,6 +285,7 @@ export default function ParentDashboard() {
                             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(44,24,16,0.4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Quick Access</p>
                             <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-6">
                                 {[
+                                    { label: 'Performance',     icon: TrendingUp, path: `/analytics?studentId=${child._id}`, color: '#7c3aed' },
                                     { label: 'Tests & Results', icon: FileText, path: '/tests',     color: '#2563eb' },
                                     { label: 'Materials',       icon: BookOpen, path: '/materials', color: '#16a34a' },
                                     { label: 'Notices',         icon: Clock,    path: '/notices',   color: '#E8A020' },
