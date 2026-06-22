@@ -37,17 +37,18 @@ const runBirthdayGreetings = async () => {
 
         // Skip anyone already greeted this calendar year
         const toGreet = candidates.filter(s => s.lastBirthdayGreetYear !== year);
-        if (toGreet.length === 0) return;
+        if (toGreet.length === 0) return { greeted: 0, names: [] };
 
         for (const s of toGreet) {
-            sendPushToUser(s._id, {
+            // Await sends so they reliably complete before the HTTP trigger responds
+            await sendPushToUser(s._id, {
                 title: '🎂 Happy Birthday!',
                 body: `Wishing you a wonderful year ahead, ${s.name?.split(' ')[0] || 'champion'}!`,
                 url: '/dashboard',
             }).catch(() => {});
 
             if (s.email) {
-                sendEmail({
+                await sendEmail({
                     to: s.email,
                     subject: '🎂 Happy Birthday from Choksi Classes!',
                     html: birthdayEmail(s.name || 'Student'),
@@ -58,19 +59,21 @@ const runBirthdayGreetings = async () => {
         }
 
         // Let the teachers know whose birthday it is today
+        const names = toGreet.map(s => s.name).filter(Boolean);
         const sirs = await User.find({ role: 'sir', isActive: true }).select('_id').lean();
-        if (sirs.length) {
-            const names = toGreet.map(s => s.name).filter(Boolean).join(', ');
-            sendPushToMany(sirs.map(s => s._id), {
+        if (sirs.length && names.length) {
+            await sendPushToMany(sirs.map(s => s._id), {
                 title: '🎂 Birthday today',
-                body: `It's ${names}'s birthday today. Wish them!`,
+                body: `It's ${names.join(', ')}'s birthday today. Wish them!`,
                 url: '/students',
             }).catch(() => {});
         }
 
         console.log(`✓ Sent ${toGreet.length} birthday greeting(s).`);
+        return { greeted: toGreet.length, names };
     } catch (err) {
         console.error('Birthday job failed:', err.message);
+        return { greeted: 0, names: [], error: err.message };
     }
 };
 

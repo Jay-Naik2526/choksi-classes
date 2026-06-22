@@ -127,6 +127,39 @@ app.use('/api/enquiry',  require('./src/routes/enquiryRoutes'));
 app.get('/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV || 'development' }));
 app.get('/',       (req, res) => res.json({ message: 'Choksi Classes API', version: '1.0.0' }));
 
+// ── Time diagnostic — confirms the server's clock & that IST conversion works ──
+app.get('/api/time', (req, res) => {
+    const now = new Date();
+    res.json({
+        serverUTC:        now.toISOString(),
+        serverLocal:      now.toString(),                                     // host timezone (UTC on HF Spaces)
+        istTime:          now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
+        tzOffsetMinutes:  now.getTimezoneOffset(),                            // 0 means host is UTC
+        nodeTZ:           process.env.TZ || '(not set — defaults to UTC)',
+        // The birthday cron fires when IST hour = 8, regardless of the values above.
+        birthdayCron:     '0 8 * * * (Asia/Kolkata)',
+    });
+});
+
+// ── External cron trigger: birthday greetings ────────────────────────────────
+// Called daily (e.g. by cron-job.org at 08:00 IST). The request also wakes a
+// sleeping free Hugging Face Space. Protected by a shared secret; idempotent
+// (greetings are skipped for anyone already wished this year).
+app.all('/api/run-birthdays', async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return res.status(503).json({ message: 'CRON_SECRET not configured on the server' });
+
+    const provided = req.get('x-cron-secret') || req.query.token;
+    if (provided !== secret) return res.status(401).json({ message: 'Unauthorized' });
+
+    try {
+        const result = await require('./src/utils/birthdayJob').runBirthdayGreetings();
+        res.json({ ok: true, ...result });
+    } catch (e) {
+        res.status(500).json({ ok: false, message: e.message });
+    }
+});
+
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
     // Multer upload errors (e.g. file too large) → 400, not 500
