@@ -16,12 +16,29 @@ exports.getMaterials = async (req, res) => {
         if (type) filter.type = type;
         if (search) filter.title = new RegExp(search, 'i');
 
+        // FIX #3: Students and parents only see materials for their batch(es)
+        if (req.user.role === 'student' || req.user.role === 'parent') {
+            let studentIds = [req.user._id];
+            if (req.user.role === 'parent') {
+                const parent = await User.findById(req.user._id).select('childIds').lean();
+                studentIds = parent.childIds || [];
+            }
+            // Gather all batchIds across the relevant students
+            const studentDocs = await User.find({ _id: { $in: studentIds } }).select('batchIds').lean();
+            const allBatchIds = studentDocs.flatMap(s => s.batchIds || []);
+            filter.$or = [
+                { batchIds: { $size: 0 } },
+                { batchIds: { $elemMatch: { $in: allBatchIds } } },
+            ];
+        }
+
         const total = await Material.countDocuments(filter);
         const materials = await Material.find(filter)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .populate('uploadedBy', 'name')
+            .populate('batchIds', 'name')
             .lean();
 
         const user = await User.findById(req.user._id).select('bookmarkedMaterials').lean();
@@ -53,12 +70,14 @@ exports.createMaterial = async (req, res) => {
             driveLink = result.webViewLink;
         }
 
+        const parsedBatchIds = batchIds ? JSON.parse(batchIds) : [];
+
         const material = await Material.create({
             title, subject, chapter, type,
             fileId, driveLink,
             videoUrl: type === 'video' ? videoUrl : undefined,
             description,
-            batchIds: batchIds ? JSON.parse(batchIds) : [],
+            batchIds: parsedBatchIds,
             uploadedBy: req.user._id,
         });
 
@@ -88,7 +107,8 @@ exports.updateMaterial = async (req, res) => {
 // DELETE /api/materials/:id
 exports.deleteMaterial = async (req, res) => {
     try {
-        const material = await Material.findOne({ _id: req.params.id, uploadedBy: req.user._id });
+        // FIX #2: Any sir can delete any material (not just the uploader)
+        const material = await Material.findById(req.params.id);
         if (!material) return res.status(404).json({ message: 'Material not found' });
         if (material.fileId) await deleteFromDrive(material.fileId);
         material.isActive = false;
@@ -122,6 +142,43 @@ exports.getSubjects = async (req, res) => {
     try {
         const subjects = await Material.distinct('subject', { isActive: true });
         res.json({ subjects });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// GET /api/materials/batch-groups — returns batch-grouped summary for folder view
+exports.getBatchGroups = async (req, res) => {
+    try {
+        const materials = await Material.find({ isActive: true })
+            .populate('batchIds', 'name')
+            .select('batchIds subject chapter title')
+            .lean();
+
+        // Build { batchId: { id, name, subjects: Set } }
+        const batchMap = {};
+
+        materials.forEach(m => {
+            const batches = m.batchIds && m.batchIds.length > 0
+                ? m.batchIds
+                : [{ _id: 'general', name: 'General' }];
+
+            batches.forEach(b => {
+                const key = b._id?.toString() || 'general';
+                if (!batchMap[key]) batchMap[key] = { id: key, name: b.name || 'General', count: 0, subjects: new Set() };
+                batchMap[key].count += 1;
+                if (m.subject) batchMap[key].subjects.add(m.subject);
+            });
+        });
+
+        const groups = Object.values(batchMap).map(g => ({
+            id: g.id,
+            name: g.name,
+            count: g.count,
+            subjectCount: g.subjects.size,
+        }));
+
+        res.json({ groups });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }

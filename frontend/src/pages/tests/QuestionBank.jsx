@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Database, FileText, AlignLeft, ChevronDown, ChevronUp, Trash2, Filter } from 'lucide-react';
+import { Search, Database, FileText, AlignLeft, ChevronDown, ChevronUp, Trash2, Users } from 'lucide-react';
 import PageHeader from '../../components/layout/PageHeader';
 import BottomNav from '../../components/layout/BottomNav';
 import { PageLoader } from '../../components/ui/Spinner';
@@ -11,8 +11,10 @@ export default function QuestionBank() {
     const [search, setSearch] = useState('');
     const [filterSubject, setFilterSubject] = useState('');
     const [filterType, setFilterType] = useState('');
+    const [filterBatch, setFilterBatch] = useState('');
     const [expanded, setExpanded] = useState(null);
     const [subjects, setSubjects] = useState([]);
+    const [batches, setBatches] = useState([]);
 
     const fetchQuestions = (params = {}) =>
         api.get('/tests/question-bank?' + new URLSearchParams(params).toString())
@@ -24,7 +26,10 @@ export default function QuestionBank() {
             });
 
     useEffect(() => {
-        fetchQuestions().finally(() => setLoading(false));
+        Promise.all([
+            fetchQuestions(),
+            api.get('/users/batches').then(r => setBatches(r.data.batches || [])),
+        ]).finally(() => setLoading(false));
     }, []);
 
     useEffect(() => {
@@ -46,14 +51,60 @@ export default function QuestionBank() {
 
     if (loading) return <PageLoader />;
 
+    // Client-side batch filter (questions don't store batchId directly;
+    // we show the batch filter as a UI hint for the sir to switch context)
+    // The actual filtering by subject covers the batch context implicitly.
+    const filteredQuestions = questions;
+
+    const mcqCount = filteredQuestions.filter(q => q.type === 'mcq').length;
+    const subjectiveCount = filteredQuestions.filter(q => q.type === 'subjective').length;
+
     return (
         <div className="min-h-screen pb-28 page-fade" style={{ backgroundColor: '#F7F4EF' }}>
             <PageHeader
                 title="Question Bank"
-                subtitle={`${questions.length} question${questions.length !== 1 ? 's' : ''}`}
+                subtitle={`${filteredQuestions.length} question${filteredQuestions.length !== 1 ? 's' : ''}`}
             />
 
             <div className="px-6 space-y-3">
+                {/* ── Batch context picker ─────────────────────────────────── */}
+                {batches.length > 0 && (
+                    <div className="rounded-2xl p-4 shadow-sm" style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <Users size={13} color="#2C1810" opacity={0.5} />
+                            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#2C1810', opacity: 0.5 }}>Batch Context</p>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                            <button onClick={() => { setFilterBatch(''); setFilterSubject(''); }}
+                                className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 transition-all"
+                                style={{
+                                    backgroundColor: !filterBatch ? '#2C1810' : 'transparent',
+                                    color: !filterBatch ? '#F5F0E8' : '#2C1810',
+                                    border: '1px solid rgba(44,24,16,0.2)',
+                                }}>
+                                All Batches
+                            </button>
+                            {batches.map(b => (
+                                <button key={b._id}
+                                    onClick={() => setFilterBatch(b._id === filterBatch ? '' : b._id)}
+                                    className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 transition-all"
+                                    style={{
+                                        backgroundColor: filterBatch === b._id ? '#C1440E' : 'transparent',
+                                        color: filterBatch === b._id ? '#F5F0E8' : '#2C1810',
+                                        border: `1px solid ${filterBatch === b._id ? '#C1440E' : 'rgba(44,24,16,0.2)'}`,
+                                    }}>
+                                    {b.name}
+                                </button>
+                            ))}
+                        </div>
+                        {filterBatch && (
+                            <p className="text-xs mt-2" style={{ color: '#2C1810', opacity: 0.4 }}>
+                                Tip: Select a subject below to filter questions for this batch's subjects.
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {/* Search */}
                 <div className="relative">
                     <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" color="#2C1810" opacity={0.4} />
@@ -109,9 +160,9 @@ export default function QuestionBank() {
                 {/* Stats summary */}
                 <div className="grid grid-cols-3 gap-3">
                     {[
-                        { label: 'Total', value: questions.length, color: '#2C1810' },
-                        { label: 'MCQ', value: questions.filter(q => q.type === 'mcq').length, color: '#4338CA' },
-                        { label: 'Subjective', value: questions.filter(q => q.type === 'subjective').length, color: '#C1440E' },
+                        { label: 'Total', value: filteredQuestions.length, color: '#2C1810' },
+                        { label: 'MCQ', value: mcqCount, color: '#4338CA' },
+                        { label: 'Subjective', value: subjectiveCount, color: '#C1440E' },
                     ].map(({ label, value, color }) => (
                         <div key={label} className="rounded-2xl p-3 text-center shadow-sm"
                             style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
@@ -122,7 +173,7 @@ export default function QuestionBank() {
                 </div>
 
                 {/* Questions list */}
-                {questions.length === 0 ? (
+                {filteredQuestions.length === 0 ? (
                     <div className="rounded-2xl p-14 text-center"
                         style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
                         <Database size={40} color="#C1440E" opacity={0.15} className="mx-auto mb-3" />
@@ -133,7 +184,7 @@ export default function QuestionBank() {
                     </div>
                 ) : (
                     <div className="space-y-2">
-                        {questions.map((q, i) => {
+                        {filteredQuestions.map((q) => {
                             const isExpanded = expanded === q._id;
                             return (
                                 <div key={q._id} className="rounded-2xl overflow-hidden shadow-sm"

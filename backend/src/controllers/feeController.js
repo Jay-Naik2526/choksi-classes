@@ -13,8 +13,17 @@ exports.getFees = async (req, res) => {
         let filter = {};
         if (role === 'student') filter.studentId = _id;
         else if (role === 'parent') {
-            const parent = await User.findById(_id);
-            filter.studentId = { $in: parent.childIds };
+            const studentId = req.query.studentId;
+            const parent = await User.findById(_id).lean();
+            if (studentId) {
+                const isChild = parent.childIds?.some(cid => cid.toString() === studentId);
+                if (!isChild) {
+                    return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
+                }
+                filter.studentId = studentId;
+            } else {
+                filter.studentId = { $in: parent.childIds || [] };
+            }
         } else {
             if (studentId) filter.studentId = studentId;
             if (status) filter.status = status;

@@ -4,7 +4,7 @@ import {
     Plus, BookOpen, Search, FileText, Video, StickyNote,
     Trash2, ExternalLink, Bookmark, BookmarkCheck,
     Folder, FolderOpen, ChevronRight, Home, ArrowLeft,
-    Grid3X3, List, File
+    Grid3X3, List, File, Users
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import PageHeader from '../../components/layout/PageHeader';
@@ -16,7 +16,7 @@ const typeIcon  = { pdf: FileText, video: Video, note: StickyNote };
 const typeColor = { pdf: '#dc2626', video: '#2563eb', note: '#059669' };
 const typeBg    = { pdf: 'rgba(220,38,38,0.08)', video: 'rgba(37,99,235,0.08)', note: 'rgba(5,150,105,0.08)' };
 
-// ── Subject folder colour palette ─────────────────────────────────────────
+// ── Folder colour palette ──────────────────────────────────────────────────
 const FOLDER_PALETTE = [
     { bg: 'rgba(193,68,14,0.1)',   icon: '#C1440E' },
     { bg: 'rgba(37,99,235,0.1)',   icon: '#2563eb' },
@@ -33,14 +33,14 @@ export default function MaterialList() {
     const { user } = useAuthStore();
     const navigate  = useNavigate();
 
-    const [materials, setMaterials]       = useState([]);
-    const [loading, setLoading]           = useState(true);
-    const [search, setSearch]             = useState('');
+    const [materials, setMaterials]           = useState([]);
+    const [loading, setLoading]               = useState(true);
+    const [search, setSearch]                 = useState('');
     const [showBookmarked, setShowBookmarked] = useState(false);
-    const [viewMode, setViewMode]         = useState('folder'); // 'folder' | 'list'
+    const [viewMode, setViewMode]             = useState('folder'); // 'folder' | 'list'
 
-    // Folder-browser path: [] → show subjects; [subject] → show chapters; [subject, chapter] → show files
-    const [path, setPath] = useState([]);   // e.g. [] | ['Maths'] | ['Maths','Algebra']
+    // path: [] = batch root | [batchKey] | [batchKey, subject] | [batchKey, subject, chapter]
+    const [path, setPath] = useState([]);
 
     const fetchAll = () =>
         api.get('/materials')
@@ -66,8 +66,9 @@ export default function MaterialList() {
         } catch {}
     };
 
-    // ── Derived folder data ────────────────────────────────────────────────
-    const { subjectMap, displayed } = useMemo(() => {
+    // ── Derived hierarchy ─────────────────────────────────────────────────
+    // Structure: { batchKey: { batchName, subjects: { subject: { chapter: [materials] } } } }
+    const hierarchy = useMemo(() => {
         let filtered = materials;
         if (showBookmarked) filtered = filtered.filter(m => m.isBookmarked);
         if (search) {
@@ -79,17 +80,27 @@ export default function MaterialList() {
             );
         }
 
-        // Build hierarchy: { subject → { chapter → [materials] } }
-        const map = {};
+        const map = {}; // batchKey → { name, subjects: { subj: { ch: [m] } } }
+
         filtered.forEach(m => {
-            const sub = m.subject || 'Uncategorised';
-            const ch  = m.chapter  || 'General';
-            if (!map[sub]) map[sub] = {};
-            if (!map[sub][ch]) map[sub][ch] = [];
-            map[sub][ch].push(m);
+            const batchList = m.batchIds && m.batchIds.length > 0
+                ? m.batchIds
+                : [{ _id: 'general', name: 'General' }];
+
+            batchList.forEach(b => {
+                const key  = b._id?.toString() || 'general';
+                const name = b.name || 'General';
+                const sub  = m.subject || 'Uncategorised';
+                const ch   = m.chapter  || 'General';
+
+                if (!map[key]) map[key] = { name, subjects: {} };
+                if (!map[key].subjects[sub]) map[key].subjects[sub] = {};
+                if (!map[key].subjects[sub][ch]) map[key].subjects[sub][ch] = [];
+                map[key].subjects[sub][ch].push(m);
+            });
         });
 
-        return { subjectMap: map, displayed: filtered };
+        return map;
     }, [materials, showBookmarked, search]);
 
     if (loading) return <PageLoader />;
@@ -97,36 +108,85 @@ export default function MaterialList() {
     const isSir       = user?.role === 'sir';
     const canBookmark = user?.role === 'student' || user?.role === 'parent';
 
-    // ── What level are we at? ───────────────────────────────────────────────
+    // Student batch filter — only show batches they belong to
+    const userBatchIds = user?.batchIds?.map(b => b?.toString?.() || b) || [];
+
+    // ── Path levels ───────────────────────────────────────────────────────
     const atRoot    = path.length === 0;
-    const atSubject = path.length === 1;
-    const atChapter = path.length === 2;
+    const atBatch   = path.length === 1;
+    const atSubject = path.length === 2;
+    const atChapter = path.length === 3;
 
-    const currentSubject = path[0];
-    const currentChapter = path[1];
+    const [currentBatchKey, currentSubject, currentChapter] = path;
 
-    // Items at current level
-    const subjectNames = Object.keys(subjectMap).sort();
-    const chapterNames = atSubject ? Object.keys(subjectMap[currentSubject] || {}).sort() : [];
+    // Batch keys visible to this user
+    const allBatchKeys = Object.keys(hierarchy).sort((a, b) => {
+        const na = hierarchy[a].name;
+        const nb = hierarchy[b].name;
+        if (na === 'General') return 1;
+        if (nb === 'General') return -1;
+        return na.localeCompare(nb);
+    });
+
+    const visibleBatchKeys = isSir
+        ? allBatchKeys
+        : allBatchKeys.filter(k => k === 'general' || userBatchIds.includes(k));
+
+    const subjectNames = atBatch
+        ? Object.keys(hierarchy[currentBatchKey]?.subjects || {}).sort()
+        : [];
+
+    const chapterNames = atSubject
+        ? Object.keys(hierarchy[currentBatchKey]?.subjects?.[currentSubject] || {}).sort()
+        : [];
+
     const filesAtLevel = atChapter
-        ? (subjectMap[currentSubject]?.[currentChapter] || [])
-        : atSubject
-            ? Object.values(subjectMap[currentSubject] || {}).flat()  // all files under subject when no chapter drill-down
-            : [];
+        ? (hierarchy[currentBatchKey]?.subjects?.[currentSubject]?.[currentChapter] || [])
+        : [];
 
-    // In list/search mode, just show all matching files
     const isSearching = search.length > 0;
 
-    const fileCount = (sub) => Object.values(subjectMap[sub] || {}).flat().length;
-    const chapterCount = (sub) => Object.keys(subjectMap[sub] || {}).length;
+    // Helper counts
+    const batchFileCount = (k) => {
+        let c = 0;
+        Object.values(hierarchy[k]?.subjects || {}).forEach(subs =>
+            Object.values(subs).forEach(files => c += files.length)
+        );
+        return c;
+    };
+    const batchSubjectCount = (k) => Object.keys(hierarchy[k]?.subjects || {}).length;
+
+    const subjectFileCount = (k, s) => {
+        let c = 0;
+        Object.values(hierarchy[k]?.subjects?.[s] || {}).forEach(files => c += files.length);
+        return c;
+    };
+    const subjectChapterCount = (k, s) => Object.keys(hierarchy[k]?.subjects?.[s] || {}).length;
+
+    // Flat list for search / list mode
+    const allDisplayed = useMemo(() => {
+        let out = [];
+        Object.values(hierarchy).forEach(b =>
+            Object.values(b.subjects).forEach(subs =>
+                Object.values(subs).forEach(files => out.push(...files))
+            )
+        );
+        // deduplicate by _id (material may appear in multiple batches)
+        const seen = new Set();
+        return out.filter(m => { if (seen.has(m._id)) return false; seen.add(m._id); return true; });
+    }, [hierarchy]);
+
+    // Breadcrumb label helper
+    const batchName = currentBatchKey ? (hierarchy[currentBatchKey]?.name || currentBatchKey) : '';
 
     return (
         <div className="min-h-screen pb-28 page-fade" style={{ backgroundColor: '#F7F4EF' }}>
             <PageHeader
                 title="Study Materials"
                 subtitle={
-                    atRoot ? `${subjectNames.length} subject${subjectNames.length !== 1 ? 's' : ''}`
-                    : atSubject ? currentSubject
+                    atRoot    ? `${visibleBatchKeys.length} batch${visibleBatchKeys.length !== 1 ? 'es' : ''}`
+                    : atBatch   ? batchName
+                    : atSubject ? `${batchName} › ${currentSubject}`
                     : `${currentSubject} › ${currentChapter}`
                 }
                 action={
@@ -162,9 +222,8 @@ export default function MaterialList() {
                         style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(193,68,14,0.12)', color: '#2C1810' }} />
                 </div>
 
-                {/* ── Top bar: breadcrumb + saved toggle ─────────────── */}
+                {/* ── Breadcrumb + saved toggle ───────────────────────── */}
                 <div className="flex items-center gap-2 flex-wrap">
-                    {/* Breadcrumb */}
                     {!isSearching && (
                         <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
                             <button
@@ -177,24 +236,57 @@ export default function MaterialList() {
                                 <Home size={13} />
                                 <span className="text-xs font-medium">Home</span>
                             </button>
-                            {path.map((segment, idx) => (
-                                <div key={idx} className="flex items-center gap-1 flex-shrink-0">
+
+                            {/* Batch crumb */}
+                            {path.length >= 1 && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                     <ChevronRight size={12} color="#2C1810" opacity={0.3} />
                                     <button
-                                        onClick={() => setPath(path.slice(0, idx + 1))}
+                                        onClick={() => setPath([currentBatchKey])}
                                         className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all"
                                         style={{
-                                            backgroundColor: idx === path.length - 1 ? 'rgba(193,68,14,0.1)' : 'transparent',
-                                            color: idx === path.length - 1 ? '#C1440E' : '#2C1810',
-                                            maxWidth: '120px',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
+                                            backgroundColor: path.length === 1 ? 'rgba(193,68,14,0.1)' : 'transparent',
+                                            color: path.length === 1 ? '#C1440E' : '#2C1810',
+                                            maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                         }}>
-                                        {segment}
+                                        {batchName}
                                     </button>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* Subject crumb */}
+                            {path.length >= 2 && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    <ChevronRight size={12} color="#2C1810" opacity={0.3} />
+                                    <button
+                                        onClick={() => setPath([currentBatchKey, currentSubject])}
+                                        className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                        style={{
+                                            backgroundColor: path.length === 2 ? 'rgba(193,68,14,0.1)' : 'transparent',
+                                            color: path.length === 2 ? '#C1440E' : '#2C1810',
+                                            maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                        }}>
+                                        {currentSubject}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Chapter crumb */}
+                            {path.length >= 3 && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    <ChevronRight size={12} color="#2C1810" opacity={0.3} />
+                                    <button
+                                        onClick={() => setPath([currentBatchKey, currentSubject, currentChapter])}
+                                        className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                        style={{
+                                            backgroundColor: 'rgba(193,68,14,0.1)',
+                                            color: '#C1440E',
+                                            maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                        }}>
+                                        {currentChapter}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -214,7 +306,7 @@ export default function MaterialList() {
                 </div>
 
                 {/* ── Empty state ─────────────────────────────────────── */}
-                {displayed.length === 0 && (
+                {allDisplayed.length === 0 && (
                     <div className="rounded-2xl p-14 text-center"
                         style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
                         <BookOpen size={40} color="#C1440E" opacity={0.15} className="mx-auto mb-3" />
@@ -232,10 +324,10 @@ export default function MaterialList() {
                 )}
 
                 {/* ══ FOLDER VIEW ══════════════════════════════════════ */}
-                {viewMode === 'folder' && !isSearching && displayed.length > 0 && (
+                {viewMode === 'folder' && !isSearching && allDisplayed.length > 0 && (
                     <div className="space-y-3">
 
-                        {/* Back button when inside a folder */}
+                        {/* Back button */}
                         {!atRoot && (
                             <button
                                 onClick={() => setPath(p => p.slice(0, -1))}
@@ -246,34 +338,72 @@ export default function MaterialList() {
                             </button>
                         )}
 
-                        {/* ── Root: subject folders ──────────────────── */}
+                        {/* ── ROOT: Batch folders ──────────────────────── */}
                         {atRoot && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {subjectNames.map((sub, idx) => {
+                                {visibleBatchKeys.map((key, idx) => {
                                     const { bg, icon } = folderColor(idx);
+                                    const fc = batchFileCount(key);
+                                    const sc = batchSubjectCount(key);
+                                    const name = hierarchy[key]?.name || key;
                                     return (
-                                        <button key={sub}
-                                            onClick={() => setPath([sub])}
+                                        <button key={key}
+                                            onClick={() => setPath([key])}
                                             className="rounded-2xl p-4 text-left transition-all active:scale-95"
                                             style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
-                                            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                                                style={{ backgroundColor: bg }}>
-                                                <FolderOpen size={24} color={icon} />
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                                                    style={{ backgroundColor: bg }}>
+                                                    <Users size={22} color={icon} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold leading-snug mb-1 truncate" style={{ color: '#2C1810' }}>
+                                                        {name}
+                                                    </p>
+                                                    <p className="text-xs" style={{ color: '#2C1810', opacity: 0.45 }}>
+                                                        {sc} subject{sc !== 1 ? 's' : ''} · {fc} file{fc !== 1 ? 's' : ''}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <p className="text-sm font-semibold leading-snug mb-1" style={{ color: '#2C1810' }}>
-                                                {sub}
-                                            </p>
-                                            <p className="text-xs" style={{ color: '#2C1810', opacity: 0.45 }}>
-                                                {chapterCount(sub) > 1 ? `${chapterCount(sub)} chapters · ` : ''}
-                                                {fileCount(sub)} file{fileCount(sub) !== 1 ? 's' : ''}
-                                            </p>
                                         </button>
                                     );
                                 })}
                             </div>
                         )}
 
-                        {/* ── Subject level: chapter sub-folders ────────── */}
+                        {/* ── BATCH level: Subject folders ─────────────── */}
+                        {atBatch && subjectNames.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold uppercase tracking-wider px-1"
+                                    style={{ color: '#2C1810', opacity: 0.4 }}>Subjects</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {subjectNames.map((sub, idx) => {
+                                        const { bg, icon } = folderColor(idx);
+                                        const fc = subjectFileCount(currentBatchKey, sub);
+                                        const cc = subjectChapterCount(currentBatchKey, sub);
+                                        return (
+                                            <button key={sub}
+                                                onClick={() => setPath([currentBatchKey, sub])}
+                                                className="rounded-2xl p-4 text-left transition-all active:scale-95"
+                                                style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
+                                                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-2.5"
+                                                    style={{ backgroundColor: bg }}>
+                                                    <FolderOpen size={22} color={icon} />
+                                                </div>
+                                                <p className="text-sm font-semibold leading-snug mb-1 truncate" style={{ color: '#2C1810' }}>
+                                                    {sub}
+                                                </p>
+                                                <p className="text-xs" style={{ color: '#2C1810', opacity: 0.45 }}>
+                                                    {cc > 1 ? `${cc} chapters · ` : ''}{fc} file{fc !== 1 ? 's' : ''}
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SUBJECT level: Chapter folders ──────────── */}
                         {atSubject && chapterNames.length > 0 && (
                             <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-wider px-1"
@@ -281,10 +411,10 @@ export default function MaterialList() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {chapterNames.map((ch, idx) => {
                                         const { bg, icon } = folderColor(idx + 2);
-                                        const count = (subjectMap[currentSubject]?.[ch] || []).length;
+                                        const count = (hierarchy[currentBatchKey]?.subjects?.[currentSubject]?.[ch] || []).length;
                                         return (
                                             <button key={ch}
-                                                onClick={() => setPath([currentSubject, ch])}
+                                                onClick={() => setPath([currentBatchKey, currentSubject, ch])}
                                                 className="rounded-2xl p-4 text-left transition-all active:scale-95"
                                                 style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
@@ -304,8 +434,8 @@ export default function MaterialList() {
                             </div>
                         )}
 
-                        {/* ── Files at chapter level (or subject if only 1 chapter group) ── */}
-                        {(atChapter || (atSubject && chapterNames.length === 0)) && filesAtLevel.length > 0 && (
+                        {/* ── CHAPTER level: Files ────────────────────── */}
+                        {atChapter && filesAtLevel.length > 0 && (
                             <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-wider px-1"
                                     style={{ color: '#2C1810', opacity: 0.4 }}>Files</p>
@@ -322,9 +452,9 @@ export default function MaterialList() {
                 )}
 
                 {/* ══ LIST VIEW or SEARCH results ══════════════════════ */}
-                {(viewMode === 'list' || isSearching) && displayed.length > 0 && (
+                {(viewMode === 'list' || isSearching) && allDisplayed.length > 0 && (
                     <FileGrid
-                        files={displayed}
+                        files={allDisplayed}
                         isSir={isSir}
                         canBookmark={canBookmark}
                         onDelete={handleDelete}
@@ -362,6 +492,12 @@ function FileGrid({ files, isSir, canBookmark, onDelete, onBookmark, showPath = 
                                 </p>
                                 {showPath && (
                                     <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                        {m.batchIds && m.batchIds.length > 0 && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: 'rgba(124,58,237,0.08)', color: '#7c3aed' }}>
+                                                {m.batchIds[0]?.name || 'Batch'}
+                                            </span>
+                                        )}
                                         <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
                                             style={{ backgroundColor: 'rgba(193,68,14,0.08)', color: '#C1440E' }}>
                                             {m.subject}

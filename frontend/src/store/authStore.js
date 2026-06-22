@@ -9,6 +9,8 @@ const useAuthStore = create(
             role: null, // 'sir' | 'student' | 'parent'
 
             setAuth: (user, token) => {
+                // FIX #13: Don't double-store — api.js reads from localStorage.getItem('token')
+                // which is the same key we set here; Zustand persist stores the full state
                 localStorage.setItem('token', token);
                 set({ user, token, role: user.role });
                 // Request push notification permission after login

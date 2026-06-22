@@ -93,10 +93,20 @@ exports.getStudentStats = async (req, res) => {
             ? Math.round(attempts.reduce((s, a) => s + (a.percentage || 0), 0) / testsTaken)
             : 0;
 
-        const [doubtsAsked, doubtsAnswered, materialsAvailable] = await Promise.all([
+        // FIX #4: Count only materials accessible to this student's batches
+        const Material = require('../models/Material');
+        const studentDoc = await User.findById(studentId).select('batchIds').lean();
+        const materialsAvailable = await Material.countDocuments({
+            isActive: true,
+            $or: [
+                { batchIds: { $size: 0 } },
+                { batchIds: { $elemMatch: { $in: studentDoc.batchIds || [] } } },
+            ],
+        });
+
+        const [doubtsAsked, doubtsAnswered] = await Promise.all([
             Doubt.countDocuments({ studentId }),
             Doubt.countDocuments({ studentId, status: 'answered' }),
-            require('../models/Material').countDocuments({ isActive: true }),
         ]);
         const doubtsAnsweredPct = doubtsAsked > 0 ? Math.round((doubtsAnswered / doubtsAsked) * 100) : 0;
 
@@ -212,8 +222,29 @@ exports.updateStudent = async (req, res) => {
         if (rollNumber !== undefined) student.rollNumber = rollNumber;
         if (address !== undefined) student.address = address;
         if (isActive !== undefined) student.isActive = isActive;
-        if (batchIds !== undefined) student.batchIds = batchIds;
-        await student.save();
+
+        // FIX #1: Keep Batch.students in sync whenever batchIds change
+        if (batchIds !== undefined) {
+            const oldBatchIds = student.batchIds.map(b => b.toString());
+            student.batchIds = batchIds;
+            await student.save();
+
+            // Remove student from all old batches, then add to new ones
+            if (oldBatchIds.length > 0) {
+                await Batch.updateMany(
+                    { _id: { $in: oldBatchIds } },
+                    { $pull: { students: student._id } }
+                );
+            }
+            if (batchIds.length > 0) {
+                await Batch.updateMany(
+                    { _id: { $in: batchIds } },
+                    { $addToSet: { students: student._id } }
+                );
+            }
+        } else {
+            await student.save();
+        }
 
         res.json({ message: 'Student updated' });
     } catch (err) {
@@ -247,6 +278,7 @@ exports.deleteBatch = async (req, res) => {
     try {
         const batch = await Batch.findById(req.params.id);
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
+        // Remove batch reference from all students (both arrays stay in sync)
         await User.updateMany({ batchIds: batch._id }, { $pull: { batchIds: batch._id } });
         await batch.deleteOne();
         res.json({ message: 'Batch deleted' });
@@ -565,10 +597,11 @@ exports.uploadProfilePhoto = async (req, res) => {
         const user = await User.findById(req.user._id);
         if (user.profilePhotoId) await deleteFromDrive(user.profilePhotoId);
         const result = await uploadToDrive(req.file);
+        // FIX #14: Store directUrl and return the same so UI always shows the embeddable URL
         user.profilePhoto = result.directUrl;
         user.profilePhotoId = result.fileId;
         await user.save();
-        res.json({ photoUrl: result.webViewLink });
+        res.json({ photoUrl: result.directUrl });
     } catch (err) {
         res.status(500).json({ message: 'Upload failed' });
     }

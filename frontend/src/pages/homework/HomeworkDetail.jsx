@@ -19,7 +19,8 @@ export default function HomeworkDetail() {
     const [msg, setMsg]         = useState('');
 
     const fetch = () => {
-        api.get(`/homework/${id}`)
+        const queryParams = window.location.search;
+        api.get(`/homework/${id}${queryParams}`)
             .then(r => setHw(r.data.homework))
             .catch(() => {})
             .finally(() => setLoading(false));
@@ -43,9 +44,10 @@ export default function HomeworkDetail() {
 
     const handleGrade = async (studentId) => {
         const { grade, feedback } = gradeData[studentId] || {};
-        if (!grade) return;
+        // FIX #16: Trim to prevent whitespace-only grades from being accepted
+        if (!grade?.trim()) return;
         try {
-            await api.patch(`/homework/${id}/grade/${studentId}`, { grade, feedback });
+            await api.patch(`/homework/${id}/grade/${studentId}`, { grade: grade.trim(), feedback: feedback?.trim() });
             setMsg('✅ Graded!');
             fetch();
         } catch (err) {
@@ -56,8 +58,11 @@ export default function HomeworkDetail() {
     if (loading) return <PageLoader/>;
     if (!hw)     return <div style={{ padding:40, textAlign:'center', color:'rgba(44,24,16,0.5)' }}>Homework not found.</div>;
 
-    const mySubmission = user?.role === 'student'
-        ? hw.submissions?.find(s => s.studentId?._id?.toString() === user?._id?.toString() || s.studentId?.toString() === user?._id?.toString())
+    const queryParams = new URLSearchParams(window.location.search);
+    const targetStudentId = user?.role === 'parent' ? queryParams.get('studentId') : user?._id;
+
+    const mySubmission = (user?.role === 'student' || user?.role === 'parent')
+        ? hw.submissions?.find(s => s.studentId?._id?.toString() === targetStudentId?.toString() || s.studentId?.toString() === targetStudentId?.toString())
         : null;
 
     const due = new Date(hw.dueDate);
@@ -119,8 +124,8 @@ export default function HomeworkDetail() {
                     </div>
                 )}
 
-                {/* STUDENT: submitted view */}
-                {user?.role === 'student' && mySubmission && (
+                {/* STUDENT/PARENT: submitted view */}
+                {(user?.role === 'student' || user?.role === 'parent') && mySubmission && (
                     <div style={{ backgroundColor:'rgba(22,163,74,0.06)', borderRadius:16, padding:20, marginBottom:16, border:'1px solid rgba(22,163,74,0.2)' }}>
                         <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:14 }}>
                             <CheckCircle size={20} color="#16a34a"/>

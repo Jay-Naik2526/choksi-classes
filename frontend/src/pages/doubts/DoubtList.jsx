@@ -54,7 +54,12 @@ export default function DoubtList() {
             {/* Filter */}
             <div className="px-6 mb-4 flex gap-2">
                 {['all', 'pending', 'answered'].map((f) => (
-                    <button key={f} onClick={() => { setFilter(f); setLoading(true); }}
+                    <button key={f} onClick={() => {
+                        if (filter !== f) {
+                            setFilter(f);
+                            setLoading(true);
+                        }
+                    }}
                         className="px-4 py-1.5 rounded-full text-xs font-medium transition-all"
                         style={{
                             backgroundColor: filter === f ? '#C1440E' : '#FFFFFF',

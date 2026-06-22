@@ -30,17 +30,43 @@ export default function HomeworkList() {
     const [homeworks, setHomeworks] = useState([]);
     const [loading, setLoading]     = useState(true);
     const [filter, setFilter]       = useState('all'); // all | pending | submitted
+    const [children, setChildren] = useState([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
+
+    // Fetch children if parent
+    useEffect(() => {
+        if (user?.role === 'parent') {
+            api.get('/users/my-children')
+                .then(r => {
+                    const kids = r.data.children || [];
+                    setChildren(kids);
+                    if (kids.length > 0) {
+                        setSelectedStudentId(kids[0]._id);
+                    } else {
+                        setLoading(false);
+                    }
+                })
+                .catch(() => setLoading(false));
+        }
+    }, [user]);
 
     useEffect(() => {
-        api.get('/homework')
+        if (user?.role === 'parent' && !selectedStudentId) return;
+
+        let params = '';
+        if (user?.role === 'parent' && selectedStudentId) {
+            params = `?studentId=${selectedStudentId}`;
+        }
+
+        api.get(`/homework${params}`)
             .then(r => setHomeworks(r.data.homeworks || []))
             .catch(() => {})
             .finally(() => setLoading(false));
-    }, []);
+    }, [selectedStudentId, user]);
 
     const filtered = homeworks.filter(hw => {
-        if (filter === 'pending')   return user?.role === 'student' && !hw.mySubmission;
-        if (filter === 'submitted') return user?.role === 'student' && hw.mySubmission;
+        if (filter === 'pending')   return (user?.role === 'student' || user?.role === 'parent') && !hw.mySubmission;
+        if (filter === 'submitted') return (user?.role === 'student' || user?.role === 'parent') && hw.mySubmission;
         return true;
     });
 
@@ -51,8 +77,36 @@ export default function HomeworkList() {
             <PageHeader title="Homework" subtitle={`${homeworks.length} assignments`}
                 action={user?.role === 'sir' ? { label:'Assign', icon: Plus, onClick:() => navigate('/homework/create') } : null}/>
 
+            {/* Child selector if parent */}
+            {user?.role === 'parent' && children.length > 0 && (
+                <div style={{ padding: '0 20px 10px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+                    {children.map((kid) => (
+                        <button key={kid._id}
+                            onClick={() => {
+                                if (selectedStudentId !== kid._id) {
+                                    setSelectedStudentId(kid._id);
+                                    setLoading(true);
+                                }
+                            }}
+                            style={{
+                                padding: '6px 16px',
+                                borderRadius: 50,
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                backgroundColor: selectedStudentId === kid._id ? '#2C1810' : '#FFFFFF',
+                                color: selectedStudentId === kid._id ? '#F5F0E8' : 'rgba(44,24,16,0.6)',
+                                border: `1px solid ${selectedStudentId === kid._id ? '#2C1810' : 'rgba(44,24,16,0.12)'}`,
+                            }}>
+                            {kid.name.split(' ')[0]}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* Filter tabs */}
-            {user?.role === 'student' && (
+            {(user?.role === 'student' || user?.role === 'parent') && (
                 <div style={{ padding:'12px 20px 0', display:'flex', gap:8 }}>
                     {['all','pending','submitted'].map(f => (
                         <button key={f} onClick={() => setFilter(f)}
@@ -77,7 +131,7 @@ export default function HomeworkList() {
                     const s = statusInfo(hw, hw.mySubmission, user?.role);
                     const due = new Date(hw.dueDate);
                     return (
-                        <div key={hw._id} onClick={() => navigate(`/homework/${hw._id}`)}
+                        <div key={hw._id} onClick={() => navigate(`/homework/${hw._id}${user?.role === 'parent' ? `?studentId=${selectedStudentId}` : ''}`)}
                             style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:18, border:'1px solid rgba(44,24,16,0.07)', boxShadow:'0 2px 12px rgba(44,24,16,0.04)', cursor:'pointer', display:'flex', alignItems:'center', gap:14, transition:'transform .15s ease, box-shadow .15s ease' }}
                             onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 24px rgba(44,24,16,0.1)'; }}
                             onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 2px 12px rgba(44,24,16,0.04)'; }}>

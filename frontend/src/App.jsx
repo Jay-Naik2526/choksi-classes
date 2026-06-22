@@ -79,7 +79,7 @@ function App() {
                     <Route path="/homework/:id" element={<PrivateRoute><HomeworkDetail /></PrivateRoute>} />
 
                     {/* Batches */}
-                    <Route path="/batches" element={<PrivateRoute><BatchManagement /></PrivateRoute>} />
+                    <Route path="/batches" element={<PrivateRoute><Navigate to="/students" replace /></PrivateRoute>} />
 
                     {/* Referrals */}
                     <Route path="/referrals" element={<PrivateRoute><ReferralTracker /></PrivateRoute>} />

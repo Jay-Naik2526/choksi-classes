@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileText, Video, StickyNote, X } from 'lucide-react';
 import PageHeader from '../../components/layout/PageHeader';
@@ -8,12 +8,17 @@ import api from '../../utils/api';
 export default function UploadMaterial() {
     const navigate = useNavigate();
     const [form, setForm] = useState({
-        title: '', subject: '', chapter: '', type: 'pdf', videoUrl: '', description: '',
+        title: '', subject: '', chapter: '', type: 'pdf', videoUrl: '', description: '', batchId: '',
     });
+    const [batches, setBatches] = useState([]);
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [progress, setProgress] = useState('');
+
+    useEffect(() => {
+        api.get('/users/batches').then(r => setBatches(r.data.batches || []));
+    }, []);
 
     const handle = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -29,7 +34,18 @@ export default function UploadMaterial() {
 
         try {
             const formData = new FormData();
-            Object.entries(form).forEach(([k, v]) => formData.append(k, v));
+            formData.append('title', form.title);
+            formData.append('subject', form.subject);
+            formData.append('chapter', form.chapter);
+            formData.append('type', form.type);
+            formData.append('videoUrl', form.videoUrl);
+            formData.append('description', form.description);
+            // Send batchId as a JSON array for batchIds field
+            if (form.batchId) {
+                formData.append('batchIds', JSON.stringify([form.batchId]));
+            } else {
+                formData.append('batchIds', JSON.stringify([]));
+            }
             if (file) formData.append('file', file);
 
             await api.post('/materials', formData, {
@@ -88,6 +104,18 @@ export default function UploadMaterial() {
                             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#2C1810', opacity: 0.6 }}>Title *</label>
                             <input value={form.title} onChange={(e) => handle('title', e.target.value)}
                                 placeholder="Material title" className={inputCls} style={inputStyle} {...focusHandlers} />
+                        </div>
+
+                        {/* Batch selector */}
+                        <div>
+                            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#2C1810', opacity: 0.6 }}>Batch</label>
+                            <select value={form.batchId} onChange={(e) => handle('batchId', e.target.value)}
+                                className={inputCls} style={inputStyle} {...focusHandlers}>
+                                <option value="">General (All Batches)</option>
+                                {batches.map(b => (
+                                    <option key={b._id} value={b._id}>{b.name}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Database, Search, FileText, AlignLeft, CheckSquare, Square, X } from 'lucide-react';
 import PageHeader from '../../components/layout/PageHeader';
 import Spinner from '../../components/ui/Spinner';
 import api from '../../utils/api';
@@ -20,9 +20,33 @@ export default function CreateTest() {
     const [error, setError] = useState('');
     const [expanded, setExpanded] = useState(null);
 
+    // Question Bank import state
+    const [addMode, setAddMode] = useState('manual'); // 'manual' | 'bank'
+    const [bankQuestions, setBankQuestions] = useState([]);
+    const [bankLoading, setBankLoading] = useState(false);
+    const [bankSearch, setBankSearch] = useState('');
+    const [bankTypeFilter, setBankTypeFilter] = useState('');
+    const [selectedBankIds, setSelectedBankIds] = useState(new Set());
+
     useEffect(() => {
         api.get('/users/batches').then(r => setBatches(r.data.batches || []));
     }, []);
+
+    // Fetch bank questions whenever bank panel is open or filters change
+    useEffect(() => {
+        if (addMode !== 'bank') return;
+        setBankLoading(true);
+        const params = {};
+        if (bankSearch) params.search = bankSearch;
+        if (bankTypeFilter) params.type = bankTypeFilter;
+        if (details.subject) params.subject = details.subject;
+        const t = setTimeout(() => {
+            api.get('/tests/question-bank?' + new URLSearchParams(params).toString())
+                .then(r => setBankQuestions(r.data.questions || []))
+                .finally(() => setBankLoading(false));
+        }, 300);
+        return () => clearTimeout(t);
+    }, [addMode, bankSearch, bankTypeFilter, details.subject]);
 
     const handleDetail = (k, v) => setDetails(p => ({ ...p, [k]: v }));
 
@@ -52,18 +76,48 @@ export default function CreateTest() {
 
     const totalQMarks = questions.reduce((s, q) => s + (parseInt(q.marks) || 0), 0);
 
+    // Import selected questions from bank
+    const importFromBank = () => {
+        if (selectedBankIds.size === 0) return;
+        const toImport = bankQuestions
+            .filter(q => selectedBankIds.has(q._id))
+            .map(q => ({
+                type: q.type,
+                text: q.text,
+                options: q.options || ['', '', '', ''],
+                correctAnswer: q.correctAnswer || '0',
+                marks: q.marks,
+                chapter: q.chapter || '',
+                difficulty: q.difficulty || 'medium',
+                modelAnswer: q.modelAnswer || '',
+            }));
+        setQuestions(prev => [...prev, ...toImport]);
+        setSelectedBankIds(new Set());
+        setAddMode('manual');
+    };
+
+    const toggleBankSelect = (id) => {
+        setSelectedBankIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
     const handleSubmit = async (status = 'draft') => {
         if (!details.name || !details.subject || !details.date) return setError('Name, subject, and date required');
         setLoading(true);
         setError('');
         try {
+            // FIX #12: totalMarks falls back to question sum; never sends NaN
+            const computedMarks = parseInt(details.totalMarks) || totalQMarks || 0;
             const payload = {
                 ...details,
-                duration: parseInt(details.duration),
-                totalMarks: parseInt(details.totalMarks) || totalQMarks,
+                duration: parseInt(details.duration) || 60,
+                totalMarks: computedMarks,
                 questions: questions.map(q => ({
                     ...q,
-                    marks: parseInt(q.marks),
+                    marks: parseInt(q.marks) || 1,
                     options: q.type === 'mcq' ? q.options : undefined,
                     correctAnswer: q.type === 'mcq' ? q.correctAnswer : undefined,
                 })),
@@ -163,6 +217,7 @@ export default function CreateTest() {
                     </div>
                 ) : (
                     <>
+                        {/* Questions already added */}
                         {questions.map((q, i) => (
                             <div key={i} className="rounded-2xl shadow-sm overflow-hidden"
                                 style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
@@ -242,18 +297,182 @@ export default function CreateTest() {
                             </div>
                         ))}
 
-                        {/* Add question buttons */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => addQuestion('mcq')}
-                                className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
-                                style={{ border: '2px dashed rgba(193,68,14,0.3)', color: '#C1440E' }}>
-                                <Plus size={15} /> Add MCQ
-                            </button>
-                            <button onClick={() => addQuestion('subjective')}
-                                className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
-                                style={{ border: '2px dashed rgba(44,24,16,0.2)', color: '#2C1810' }}>
-                                <Plus size={15} /> Add Subjective
-                            </button>
+                        {/* ── Add mode toggle ─────────────────────────────── */}
+                        <div className="rounded-2xl overflow-hidden shadow-sm"
+                            style={{ backgroundColor: '#FFFFFF', border: '1px solid rgba(44,24,16,0.07)', boxShadow: '0 2px 12px rgba(44,24,16,0.04)' }}>
+
+                            {/* Toggle tabs */}
+                            <div className="flex border-b" style={{ borderColor: 'rgba(193,68,14,0.08)' }}>
+                                <button
+                                    onClick={() => setAddMode('manual')}
+                                    className="flex-1 py-3 text-xs font-semibold uppercase tracking-wide transition-all"
+                                    style={{
+                                        backgroundColor: addMode === 'manual' ? 'rgba(193,68,14,0.06)' : 'transparent',
+                                        color: addMode === 'manual' ? '#C1440E' : '#2C1810',
+                                        borderBottom: addMode === 'manual' ? '2px solid #C1440E' : '2px solid transparent',
+                                        opacity: addMode === 'manual' ? 1 : 0.5,
+                                    }}>
+                                    + Add Manually
+                                </button>
+                                <button
+                                    onClick={() => setAddMode('bank')}
+                                    className="flex-1 py-3 text-xs font-semibold uppercase tracking-wide transition-all flex items-center justify-center gap-1.5"
+                                    style={{
+                                        backgroundColor: addMode === 'bank' ? 'rgba(67,56,202,0.06)' : 'transparent',
+                                        color: addMode === 'bank' ? '#4338CA' : '#2C1810',
+                                        borderBottom: addMode === 'bank' ? '2px solid #4338CA' : '2px solid transparent',
+                                        opacity: addMode === 'bank' ? 1 : 0.5,
+                                    }}>
+                                    <Database size={12} />
+                                    Import from Bank
+                                </button>
+                            </div>
+
+                            {/* Manual add */}
+                            {addMode === 'manual' && (
+                                <div className="p-4 grid grid-cols-2 gap-3">
+                                    <button onClick={() => addQuestion('mcq')}
+                                        className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+                                        style={{ border: '2px dashed rgba(193,68,14,0.3)', color: '#C1440E' }}>
+                                        <Plus size={15} /> Add MCQ
+                                    </button>
+                                    <button onClick={() => addQuestion('subjective')}
+                                        className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+                                        style={{ border: '2px dashed rgba(44,24,16,0.2)', color: '#2C1810' }}>
+                                        <Plus size={15} /> Add Subjective
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Question Bank import */}
+                            {addMode === 'bank' && (
+                                <div className="p-4 space-y-3">
+                                    {/* Hint about subject filter */}
+                                    {details.subject && (
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                                            style={{ backgroundColor: 'rgba(67,56,202,0.06)', color: '#4338CA' }}>
+                                            <Database size={12} />
+                                            Showing questions for <strong>{details.subject}</strong>. Clear subject filter below to see all.
+                                        </div>
+                                    )}
+
+                                    {/* Search + type filter */}
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" color="#2C1810" opacity={0.4} />
+                                            <input value={bankSearch} onChange={e => setBankSearch(e.target.value)}
+                                                placeholder="Search questions…"
+                                                className="w-full pl-8 pr-3 py-2.5 rounded-xl text-xs outline-none"
+                                                style={{ backgroundColor: '#F7F4EF', border: '1px solid rgba(193,68,14,0.12)', color: '#2C1810' }} />
+                                        </div>
+                                        <select value={bankTypeFilter} onChange={e => setBankTypeFilter(e.target.value)}
+                                            className="px-3 py-2.5 rounded-xl text-xs outline-none flex-shrink-0"
+                                            style={{ backgroundColor: '#F7F4EF', border: '1px solid rgba(193,68,14,0.12)', color: '#2C1810' }}>
+                                            <option value="">All Types</option>
+                                            <option value="mcq">MCQ</option>
+                                            <option value="subjective">Subjective</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Selected count + import button */}
+                                    {selectedBankIds.size > 0 && (
+                                        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl"
+                                            style={{ backgroundColor: 'rgba(67,56,202,0.08)' }}>
+                                            <span className="text-xs font-semibold" style={{ color: '#4338CA' }}>
+                                                {selectedBankIds.size} question{selectedBankIds.size !== 1 ? 's' : ''} selected
+                                            </span>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setSelectedBankIds(new Set())}
+                                                    className="px-2 py-1 rounded-lg text-xs"
+                                                    style={{ color: '#4338CA', opacity: 0.6 }}>
+                                                    Clear
+                                                </button>
+                                                <button onClick={importFromBank}
+                                                    className="px-3 py-1 rounded-lg text-xs font-semibold"
+                                                    style={{ backgroundColor: '#4338CA', color: '#FFFFFF' }}>
+                                                    Add Selected →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Bank question list */}
+                                    {bankLoading ? (
+                                        <div className="py-8 flex justify-center">
+                                            <Spinner size="sm" />
+                                        </div>
+                                    ) : bankQuestions.length === 0 ? (
+                                        <div className="py-10 text-center">
+                                            <Database size={32} color="#C1440E" opacity={0.15} className="mx-auto mb-2" />
+                                            <p className="text-xs" style={{ color: '#2C1810', opacity: 0.45 }}>
+                                                No questions found in bank
+                                            </p>
+                                            <p className="text-xs mt-1" style={{ color: '#2C1810', opacity: 0.3 }}>
+                                                Questions are saved when you create tests
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                                            {/* Select all */}
+                                            <button
+                                                onClick={() => {
+                                                    if (selectedBankIds.size === bankQuestions.length) {
+                                                        setSelectedBankIds(new Set());
+                                                    } else {
+                                                        setSelectedBankIds(new Set(bankQuestions.map(q => q._id)));
+                                                    }
+                                                }}
+                                                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium w-full"
+                                                style={{ color: '#2C1810', opacity: 0.5 }}>
+                                                {selectedBankIds.size === bankQuestions.length
+                                                    ? <CheckSquare size={14} color="#4338CA" />
+                                                    : <Square size={14} />}
+                                                Select all ({bankQuestions.length})
+                                            </button>
+
+                                            {bankQuestions.map(q => {
+                                                const isSelected = selectedBankIds.has(q._id);
+                                                return (
+                                                    <div key={q._id}
+                                                        onClick={() => toggleBankSelect(q._id)}
+                                                        className="flex items-start gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all"
+                                                        style={{
+                                                            backgroundColor: isSelected ? 'rgba(67,56,202,0.06)' : '#F7F4EF',
+                                                            border: `1px solid ${isSelected ? 'rgba(67,56,202,0.25)' : 'transparent'}`,
+                                                        }}>
+                                                        {isSelected
+                                                            ? <CheckSquare size={16} color="#4338CA" className="flex-shrink-0 mt-0.5" />
+                                                            : <Square size={16} color="#2C1810" opacity={0.3} className="flex-shrink-0 mt-0.5" />}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                                                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                                                                    style={{
+                                                                        backgroundColor: q.type === 'mcq' ? 'rgba(67,56,202,0.1)' : 'rgba(193,68,14,0.1)',
+                                                                        color: q.type === 'mcq' ? '#4338CA' : '#C1440E',
+                                                                    }}>
+                                                                    {q.type === 'mcq' ? 'MCQ' : 'Subj.'}
+                                                                </span>
+                                                                {q.subject && (
+                                                                    <span className="text-xs px-1.5 py-0.5 rounded-full"
+                                                                        style={{ backgroundColor: 'rgba(193,68,14,0.07)', color: '#C1440E' }}>
+                                                                        {q.subject}
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-xs" style={{ color: '#2C1810', opacity: 0.4 }}>
+                                                                    {q.marks}m
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm leading-snug line-clamp-2" style={{ color: '#2C1810' }}>
+                                                                {q.text}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </>
                 )}

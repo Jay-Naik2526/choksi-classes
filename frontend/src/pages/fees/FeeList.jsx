@@ -24,6 +24,7 @@ function StatCard({ label, value, color, bg }) {
 export default function FeeList() {
     const { user } = useAuthStore();
     const isSir = user?.role === 'sir';
+    const isParent = user?.role === 'parent';
     const [fees, setFees] = useState([]);
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
@@ -32,6 +33,10 @@ export default function FeeList() {
     const [showAdd, setShowAdd] = useState(false);
     const [showBulk, setShowBulk] = useState(false);
     const [filterStatus, setFilterStatus] = useState('all');
+    const [selectedYear, setSelectedYear] = useState('all');
+    const [selectedMonth, setSelectedMonth] = useState('all');
+    const [children, setChildren] = useState([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
     const [adding, setAdding] = useState(false);
     const [bulking, setBulking] = useState(false);
     const [reminding, setReminding] = useState(false);
@@ -47,19 +52,41 @@ export default function FeeList() {
         year: new Date().getFullYear(), batchId: ''
     });
 
-    const fetchFees = () => api.get('/fees').then(r => setFees(r.data.fees || []));
+    const fetchFees = (overrideStudentId) => {
+        const sid = overrideStudentId || selectedStudentId;
+        let params = '';
+        if (isParent && sid) {
+            params = `?studentId=${sid}`;
+        }
+        return api.get(`/fees${params}`).then(r => setFees(r.data.fees || []));
+    };
 
     useEffect(() => {
-        const p = [fetchFees()];
-        if (isSir) {
-            p.push(
-                api.get('/users/students').then(r => setStudents(r.data.students || [])),
-                api.get('/users/batches').then(r => setBatches(r.data.batches || [])),
-                api.get('/fees/analytics').then(r => setAnalytics(r.data)),
-            );
+        if (isParent) {
+            api.get('/users/my-children')
+                .then(r => {
+                    const kids = r.data.children || [];
+                    setChildren(kids);
+                    if (kids.length > 0) {
+                        setSelectedStudentId(kids[0]._id);
+                        fetchFees(kids[0]._id).finally(() => setLoading(false));
+                    } else {
+                        setLoading(false);
+                    }
+                })
+                .catch(() => setLoading(false));
+        } else {
+            const p = [fetchFees()];
+            if (isSir) {
+                p.push(
+                    api.get('/users/students').then(r => setStudents(r.data.students || [])),
+                    api.get('/users/batches').then(r => setBatches(r.data.batches || [])),
+                    api.get('/fees/analytics').then(r => setAnalytics(r.data)),
+                );
+            }
+            Promise.all(p).finally(() => setLoading(false));
         }
-        Promise.all(p).finally(() => setLoading(false));
-    }, []);
+    }, [user]);
 
     const handleMarkPaid = async (id) => {
         await api.patch(`/fees/${id}/pay`);
@@ -108,7 +135,22 @@ export default function FeeList() {
 
     if (loading) return <PageLoader />;
 
-    const filtered = filterStatus === 'all' ? fees : fees.filter(f => f.status === filterStatus);
+    const handleChildChange = (kidId) => {
+        setSelectedStudentId(kidId);
+        setLoading(true);
+        fetchFees(kidId).finally(() => setLoading(false));
+    };
+
+    const uniqueYears = Array.from(new Set(fees.map(f => f.year))).sort((a, b) => b - a);
+
+    const filtered = fees.filter(f => {
+        if (filterStatus !== 'all' && f.status !== filterStatus) return false;
+        if (!isSir) {
+            if (selectedYear !== 'all' && f.year !== parseInt(selectedYear)) return false;
+            if (selectedMonth !== 'all' && f.month !== parseInt(selectedMonth)) return false;
+        }
+        return true;
+    });
     const totalPaid = fees.filter(f => f.status === 'paid').reduce((s, f) => s + f.amount, 0);
     const totalPending = fees.filter(f => f.status !== 'paid').reduce((s, f) => s + f.amount, 0);
 
@@ -141,6 +183,28 @@ export default function FeeList() {
                 )}
             />
 
+            {/* Child selector if parent */}
+            {isParent && children.length > 0 && (
+                <div className="px-6 mb-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                    {children.map((kid) => (
+                        <button key={kid._id}
+                            onClick={() => {
+                                if (selectedStudentId !== kid._id) {
+                                    handleChildChange(kid._id);
+                                }
+                            }}
+                            className="px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
+                            style={{
+                                backgroundColor: selectedStudentId === kid._id ? '#2C1810' : '#FFFFFF',
+                                color: selectedStudentId === kid._id ? '#F5F0E8' : 'rgba(44,24,16,0.6)',
+                                border: `1px solid ${selectedStudentId === kid._id ? '#2C1810' : 'rgba(44,24,16,0.12)'}`,
+                            }}>
+                            {kid.name.split(' ')[0]}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="px-6 space-y-4">
                 {/* Analytics */}
                 {isSir && analytics && (
@@ -158,19 +222,48 @@ export default function FeeList() {
                     </div>
                 )}
 
-                {/* Filter pills */}
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                    {['all', 'paid', 'pending', 'overdue'].map(s => (
-                        <button key={s} onClick={() => setFilterStatus(s)}
-                            className="px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-                            style={{
-                                backgroundColor: filterStatus === s ? '#C1440E' : '#FFFFFF',
-                                color: filterStatus === s ? '#F5F0E8' : '#2C1810',
-                                border: `1px solid ${filterStatus === s ? '#C1440E' : 'rgba(193,68,14,0.12)'}`,
-                            }}>
-                            {s.charAt(0).toUpperCase() + s.slice(1)}
-                        </button>
-                    ))}
+                {/* Filter pills & dropdowns */}
+                <div className="flex flex-col gap-2">
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                        {['all', 'paid', 'pending', 'overdue'].map(s => (
+                            <button key={s} onClick={() => setFilterStatus(s)}
+                                className="px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
+                                style={{
+                                    backgroundColor: filterStatus === s ? '#C1440E' : '#FFFFFF',
+                                    color: filterStatus === s ? '#F5F0E8' : '#2C1810',
+                                    border: `1px solid ${filterStatus === s ? '#C1440E' : 'rgba(193,68,14,0.12)'}`,
+                                }}>
+                                {s.charAt(0).toUpperCase() + s.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+
+                    {!isSir && (
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(e.target.value)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-[#2C1810] outline-none shadow-sm cursor-pointer"
+                                style={{ border: '1px solid rgba(44,24,16,0.12)' }}
+                            >
+                                <option value="all">All Years</option>
+                                {uniqueYears.map(yr => (
+                                    <option key={yr} value={yr}>{yr}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-[#2C1810] outline-none shadow-sm cursor-pointer"
+                                style={{ border: '1px solid rgba(44,24,16,0.12)' }}
+                            >
+                                <option value="all">All Months</option>
+                                {MONTHS.map((m, idx) => (
+                                    <option key={m} value={idx + 1}>{m}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 {/* Fee cards */}

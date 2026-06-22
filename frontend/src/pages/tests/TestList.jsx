@@ -96,7 +96,12 @@ export default function TestList() {
                 <div className="px-6 mb-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                     {children.map((kid) => (
                         <button key={kid._id}
-                            onClick={() => { setSelectedStudentId(kid._id); setLoading(true); }}
+                            onClick={() => {
+                                if (selectedStudentId !== kid._id) {
+                                    setSelectedStudentId(kid._id);
+                                    setLoading(true);
+                                }
+                            }}
                             className="px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
                             style={{
                                 backgroundColor: selectedStudentId === kid._id ? '#2C1810' : '#FFFFFF',
@@ -111,7 +116,12 @@ export default function TestList() {
 
             <div className="px-6 mb-4 flex gap-2 overflow-x-auto pb-1">
                 {filters.map((f) => (
-                    <button key={f} onClick={() => { setFilter(f); setLoading(true); }}
+                    <button key={f} onClick={() => {
+                        if (filter !== f) {
+                            setFilter(f);
+                            setLoading(true);
+                        }
+                    }}
                         className="px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
                         style={{
                             backgroundColor: filter === f ? '#C1440E' : '#FFFFFF',

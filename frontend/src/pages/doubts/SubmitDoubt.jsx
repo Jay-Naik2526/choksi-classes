@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, X } from 'lucide-react';
 import PageHeader from '../../components/layout/PageHeader';
@@ -9,8 +9,17 @@ export default function SubmitDoubt() {
     const navigate = useNavigate();
     const [form, setForm] = useState({ subject: '', chapter: '', question: '' });
     const [image, setImage] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // FIX #17: Always revoke previous object URL to prevent memory leaks
+    useEffect(() => {
+        if (!image) { setPreviewUrl(null); return; }
+        const url = URL.createObjectURL(image);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [image]);
 
     const handle = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -76,7 +85,7 @@ export default function SubmitDoubt() {
                             {image ? (
                                 <div className="flex items-center gap-3 p-3 rounded-xl"
                                     style={{ backgroundColor: '#F7F4EF', border: '1.5px dashed rgba(193,68,14,0.3)' }}>
-                                    <img src={URL.createObjectURL(image)} alt="preview"
+                                    <img src={previewUrl} alt="preview"
                                         className="w-12 h-12 object-cover rounded-lg" />
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-medium truncate" style={{ color: '#2C1810' }}>{image.name}</p>

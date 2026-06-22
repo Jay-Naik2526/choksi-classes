@@ -88,6 +88,13 @@ exports.getTest = async (req, res) => {
         if (!test) return res.status(404).json({ message: 'Test not found' });
 
         if (req.user.role === 'student') {
+            // FIX #5: Block student from re-opening a test they already submitted
+            const Attempt = require('../models/Attempt');
+            const existing = await Attempt.findOne({ studentId: req.user._id, testId: test._id });
+            if (existing && existing.status !== 'in_progress') {
+                return res.status(400).json({ message: 'Already submitted' });
+            }
+
             const testObj = test.toObject();
             testObj.questions = testObj.questions.map(q => {
                 const { correctAnswer, ...rest } = q;
@@ -105,14 +112,24 @@ exports.getTest = async (req, res) => {
 // POST /api/tests — Sir: create test
 exports.createTest = async (req, res) => {
     try {
-        const { name, subject, batchId, date, duration, totalMarks, instructions, questions } = req.body;
-        if (!name || !subject || !date || !duration || !totalMarks)
+        let { name, subject, batchId, date, duration, totalMarks, instructions, questions } = req.body;
+        if (!name || !subject || !date || !duration)
             return res.status(400).json({ message: 'Required fields missing' });
+
+        const parsedTotalMarks = parseInt(totalMarks) || (questions?.reduce((sum, q) => sum + (parseInt(q.marks) || 0), 0)) || 0;
+        if (!parsedTotalMarks) {
+            return res.status(400).json({ message: 'Total marks must be greater than 0' });
+        }
 
         const createdQuestions = [];
         if (questions?.length) {
             for (const q of questions) {
-                const question = await Question.create({ ...q, createdBy: req.user._id });
+                // FIX #6: Assign test subject to each question so bank filtering works
+                const question = await Question.create({
+                    ...q,
+                    subject: q.subject || subject,
+                    createdBy: req.user._id,
+                });
                 createdQuestions.push(question._id);
             }
         }
@@ -120,7 +137,7 @@ exports.createTest = async (req, res) => {
         const test = await Test.create({
             name, subject,
             ...(batchId ? { batchId } : {}),
-            date, duration, totalMarks, instructions,
+            date, duration, totalMarks: parsedTotalMarks, instructions,
             questions: createdQuestions,
             createdBy: req.user._id,
         });

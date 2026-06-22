@@ -7,12 +7,30 @@ const { sendPushToMany, sendPushToUser } = require('../utils/pushNotifications')
 // GET /api/homework
 exports.list = async (req, res) => {
     try {
-        const { role, _id, batchIds } = req.user;
+        const { role, _id } = req.user;
         let query = { isActive: true };
 
-        if (role === 'student') {
+        let targetStudentId = _id;
+        let targetBatchIds = req.user.batchIds || [];
+
+        if (role === 'parent') {
+            const studentId = req.query.studentId;
+            if (!studentId) {
+                return res.status(400).json({ message: 'studentId query parameter required' });
+            }
+            const parent = await User.findById(_id).lean();
+            const isChild = parent.childIds?.some(cid => cid.toString() === studentId);
+            if (!isChild) {
+                return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
+            }
+            targetStudentId = studentId;
+            const studentDoc = await User.findById(studentId).select('batchIds').lean();
+            targetBatchIds = studentDoc?.batchIds || [];
+        }
+
+        if (role === 'student' || role === 'parent') {
             query.$or = [
-                { batchId: { $in: batchIds || [] } },
+                { batchId: { $in: targetBatchIds } },
                 { batchId: null },
                 { batchId: { $exists: false } }
             ];
@@ -23,12 +41,14 @@ exports.list = async (req, res) => {
             .populate('createdBy', 'name')
             .sort({ dueDate: 1 });
 
-        if (role === 'student') {
+        if (role === 'student' || role === 'parent') {
             const result = homeworks.map(hw => {
                 const sub = hw.submissions.find(
-                    s => s.studentId?.toString() === _id.toString()
+                    s => s.studentId?.toString() === targetStudentId.toString()
                 );
-                return { ...hw.toObject(), mySubmission: sub || null };
+                const hwObj = hw.toObject();
+                delete hwObj.submissions;
+                return { ...hwObj, mySubmission: sub || null };
             });
             return res.json({ homeworks: result });
         }
@@ -42,11 +62,36 @@ exports.list = async (req, res) => {
 // GET /api/homework/:id
 exports.getOne = async (req, res) => {
     try {
+        const { role, _id } = req.user;
         const hw = await Homework.findById(req.params.id)
             .populate('batchId', 'name subject')
             .populate('createdBy', 'name')
             .populate('submissions.studentId', 'name rollNumber');
         if (!hw || !hw.isActive) return res.status(404).json({ message: 'Not found' });
+
+        if (role === 'student' || role === 'parent') {
+            let targetStudentId = _id;
+            if (role === 'parent') {
+                const studentId = req.query.studentId;
+                if (!studentId) {
+                    return res.status(400).json({ message: 'studentId query parameter required' });
+                }
+                const parent = await User.findById(_id).lean();
+                const isChild = parent.childIds?.some(cid => cid.toString() === studentId);
+                if (!isChild) {
+                    return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
+                }
+                targetStudentId = studentId;
+            }
+
+            const sub = hw.submissions.find(
+                s => (s.studentId?._id || s.studentId)?.toString() === targetStudentId.toString()
+            );
+            const hwObj = hw.toObject();
+            hwObj.submissions = sub ? [sub] : [];
+            return res.json({ homework: hwObj });
+        }
+
         res.json({ homework: hw });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
