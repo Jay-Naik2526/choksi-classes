@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { generateFeeInvoice } = require('../utils/generateInvoice');
 const { uploadToDrive } = require('../utils/driveUpload');
 const sendEmail = require('../utils/sendEmail');
+const escapeHtml = require('../utils/escapeHtml');
 
 // GET /api/fees — Sir: all fees; Student/Parent: own fees
 exports.getFees = async (req, res) => {
@@ -165,7 +166,7 @@ exports.sendReminders = async (req, res) => {
                             <h2 style="color:#F5F0E8;margin:0;font-family:Georgia">Choksi Classes</h2>
                         </div>
                         <div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee">
-                            <p>Hi <strong>${fee.studentId.name}</strong>,</p>
+                            <p>Hi <strong>${escapeHtml(fee.studentId.name)}</strong>,</p>
                             <p>Your fee for <strong>${MONTHS[fee.month]} ${fee.year}</strong> of <strong>₹${fee.amount}</strong> is due on <strong>${new Date(fee.dueDate).toLocaleDateString('en-IN')}</strong>.</p>
                             <p style="color:#888;font-size:12px">Please pay before the due date to avoid overdue status.</p>
                         </div>
@@ -185,7 +186,7 @@ exports.sendReminders = async (req, res) => {
                             <h2 style="color:#fff;margin:0;font-family:Georgia">Fee Overdue</h2>
                         </div>
                         <div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee">
-                            <p>Hi <strong>${fee.studentId.name}</strong>,</p>
+                            <p>Hi <strong>${escapeHtml(fee.studentId.name)}</strong>,</p>
                             <p>Your fee of <strong>₹${fee.amount}</strong> for <strong>${MONTHS[fee.month]} ${fee.year}</strong> is <strong style="color:#C1440E">overdue</strong>. Please pay immediately.</p>
                         </div>
                     </div>`,

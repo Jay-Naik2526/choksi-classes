@@ -1,7 +1,21 @@
 const Doubt = require('../models/Doubt');
 const User = require('../models/User');
-const { uploadToDrive } = require('../utils/driveUpload');
+const { uploadToDrive, deleteFromDrive } = require('../utils/driveUpload');
 const sendEmail = require('../utils/sendEmail');
+const escapeHtml = require('../utils/escapeHtml');
+
+// Can this user view/participate in this doubt?
+// sir → all; student → own; parent → their child's.
+const canAccessDoubt = async (user, doubt) => {
+    if (user.role === 'sir') return true;
+    const ownerId = (doubt.studentId?._id || doubt.studentId)?.toString();
+    if (user.role === 'student') return ownerId === user._id.toString();
+    if (user.role === 'parent') {
+        const parent = await User.findById(user._id).select('childIds').lean();
+        return parent?.childIds?.some(cid => cid.toString() === ownerId) || false;
+    }
+    return false;
+};
 
 // GET /api/doubts
 exports.getDoubts = async (req, res) => {
@@ -46,6 +60,8 @@ exports.getDoubt = async (req, res) => {
             .populate('studentId', 'name profilePhoto')
             .populate('answeredBy', 'name');
         if (!doubt) return res.status(404).json({ message: 'Doubt not found' });
+        if (!(await canAccessDoubt(req.user, doubt)))
+            return res.status(403).json({ message: 'Access denied' });
         res.json({ doubt });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
@@ -85,9 +101,17 @@ exports.answerDoubt = async (req, res) => {
 
         let answerImageUrl, answerImageId;
         if (req.file) {
+            // Remove the previously uploaded answer image to avoid orphaned files
+            if (doubt.answerImageId) {
+                try { await deleteFromDrive(doubt.answerImageId); } catch (_) {}
+            }
             const result = await uploadToDrive(req.file);
             answerImageUrl = result.webViewLink;
             answerImageId = result.fileId;
+        } else {
+            // No new file: keep the existing answer image
+            answerImageUrl = doubt.answerImageUrl;
+            answerImageId = doubt.answerImageId;
         }
 
         doubt.answer = req.body.answer;
@@ -109,15 +133,15 @@ exports.answerDoubt = async (req, res) => {
                         <h2 style="color:#F5F0E8;margin:0;font-family:Georgia">Choksi Classes</h2>
                     </div>
                     <div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee">
-                        <p style="color:#2C1810">Hi <strong>${doubt.studentId.name}</strong>,</p>
-                        <p>Your doubt in <strong>${doubt.subject}</strong> has been answered!</p>
+                        <p style="color:#2C1810">Hi <strong>${escapeHtml(doubt.studentId.name)}</strong>,</p>
+                        <p>Your doubt in <strong>${escapeHtml(doubt.subject)}</strong> has been answered!</p>
                         <div style="background:#F5F0E8;border-radius:8px;padding:16px;margin:12px 0">
                             <p style="margin:0 0 8px;color:#666;font-size:12px">Your Question:</p>
-                            <p style="margin:0;color:#2C1810">${doubt.question}</p>
+                            <p style="margin:0;color:#2C1810">${escapeHtml(doubt.question)}</p>
                         </div>
                         <div style="background:#fff3e0;border-radius:8px;padding:16px;border-left:4px solid #C1440E">
                             <p style="margin:0 0 8px;color:#C1440E;font-size:12px;font-weight:bold">Answer:</p>
-                            <p style="margin:0;color:#2C1810">${doubt.answer}</p>
+                            <p style="margin:0;color:#2C1810">${escapeHtml(doubt.answer)}</p>
                         </div>
                         <p style="color:#999;font-size:12px;margin-top:16px">Login to Choksi Classes to view the full answer.</p>
                     </div>
@@ -138,6 +162,8 @@ exports.addMessage = async (req, res) => {
         if (!text?.trim()) return res.status(400).json({ message: 'Message cannot be empty' });
         const doubt = await Doubt.findById(req.params.id);
         if (!doubt) return res.status(404).json({ message: 'Doubt not found' });
+        if (!(await canAccessDoubt(req.user, doubt)))
+            return res.status(403).json({ message: 'Access denied' });
         doubt.messages.push({
             sender: req.user._id,
             senderName: req.user.name,
@@ -163,6 +189,9 @@ exports.deleteDoubt = async (req, res) => {
     try {
         const doubt = await Doubt.findOne({ _id: req.params.id, studentId: req.user._id });
         if (!doubt) return res.status(404).json({ message: 'Doubt not found' });
+        // Clean up any uploaded images so they don't linger on Drive
+        if (doubt.questionImageId) { try { await deleteFromDrive(doubt.questionImageId); } catch (_) {} }
+        if (doubt.answerImageId)   { try { await deleteFromDrive(doubt.answerImageId); }   catch (_) {} }
         await doubt.deleteOne();
         res.json({ message: 'Doubt deleted' });
     } catch (err) {

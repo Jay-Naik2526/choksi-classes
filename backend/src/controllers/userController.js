@@ -6,6 +6,7 @@ const Fee = require('../models/Fee');
 const Doubt = require('../models/Doubt');
 const { uploadToDrive, deleteFromDrive } = require('../utils/driveUpload');
 const sendEmail = require('../utils/sendEmail');
+const escapeHtml = require('../utils/escapeHtml');
 
 const welcomeEmail = ({ name, email, password, role }) => `
 <div style="font-family:sans-serif;max-width:500px;margin:auto">
@@ -14,11 +15,11 @@ const welcomeEmail = ({ name, email, password, role }) => `
     <p style="color:#E8A020;margin:4px 0 0;font-size:13px">Navsari, Gujarat</p>
   </div>
   <div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee">
-    <h3 style="color:#2C1810;margin-top:0">Welcome, ${name}!</h3>
-    <p style="color:#555">Your <strong>${role}</strong> account has been created on Choksi Classes. Here are your login details:</p>
+    <h3 style="color:#2C1810;margin-top:0">Welcome, ${escapeHtml(name)}!</h3>
+    <p style="color:#555">Your <strong>${escapeHtml(role)}</strong> account has been created on Choksi Classes. Here are your login details:</p>
     <div style="background:#F5F0E8;border-radius:8px;padding:16px;margin:16px 0;border-left:4px solid #C1440E">
-      <p style="margin:4px 0"><strong>Email:</strong> ${email}</p>
-      <p style="margin:4px 0"><strong>Password:</strong> ${password}</p>
+      <p style="margin:4px 0"><strong>Email:</strong> ${escapeHtml(email)}</p>
+      <p style="margin:4px 0"><strong>Password:</strong> ${escapeHtml(password)}</p>
     </div>
     <p style="color:#888;font-size:12px">Please log in and change your password at the earliest.</p>
   </div>

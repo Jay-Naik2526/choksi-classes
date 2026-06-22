@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     otp: { type: String },
     otpExpiry: { type: Date },
+    otpAttempts: { type: Number, default: 0 },
+    passwordChangedAt: { type: Date },
     // Student-specific
     rollNumber: { type: String },
     batchIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Batch' }],
@@ -29,6 +31,9 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return;
     this.password = await bcrypt.hash(this.password, 12);
+    // Stamp password-change time (minus 1s to avoid races with token issuance).
+    // Skip on first creation so freshly-issued login tokens aren't invalidated.
+    if (!this.isNew) this.passwordChangedAt = new Date(Date.now() - 1000);
 });
 
 userSchema.methods.matchPassword = async function (entered) {

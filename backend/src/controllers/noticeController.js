@@ -49,7 +49,8 @@ exports.createNotice = async (req, res) => {
 // PUT /api/notices/:id
 exports.updateNotice = async (req, res) => {
     try {
-        const notice = await Notice.findOne({ _id: req.params.id, createdBy: req.user._id });
+        // Any Sir/admin may edit any notice
+        const notice = await Notice.findById(req.params.id);
         if (!notice) return res.status(404).json({ message: 'Notice not found' });
         const { title, body, priority, targetRole } = req.body;
         if (title) notice.title = title;
@@ -66,7 +67,8 @@ exports.updateNotice = async (req, res) => {
 // DELETE /api/notices/:id
 exports.deleteNotice = async (req, res) => {
     try {
-        const notice = await Notice.findOne({ _id: req.params.id, createdBy: req.user._id });
+        // Any Sir/admin may delete any notice
+        const notice = await Notice.findById(req.params.id);
         if (!notice) return res.status(404).json({ message: 'Notice not found' });
         notice.isActive = false;
         await notice.save();

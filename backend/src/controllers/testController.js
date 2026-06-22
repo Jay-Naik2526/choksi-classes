@@ -3,6 +3,21 @@ const Question = require('../models/Question');
 const Attempt = require('../models/Attempt');
 const User = require('../models/User');
 
+// Is this student allowed to see/attempt this test?
+// A test with no batch is open to all; otherwise the student must be in that batch.
+const studentCanAccessTest = (test, studentBatchIds = []) => {
+    if (!test.batchId) return true;
+    // batchId may be a raw ObjectId (submitAttempt) or a populated doc (getTest)
+    const target = (test.batchId._id || test.batchId).toString();
+    return (studentBatchIds || []).some(b => b.toString() === target);
+};
+
+// Recompute totalMarks from a test's current questions (keeps scoring honest).
+const recomputeTotalMarks = async (testId) => {
+    const populated = await Test.findById(testId).populate('questions', 'marks');
+    return (populated.questions || []).reduce((s, q) => s + (q.marks || 0), 0);
+};
+
 // GET /api/tests
 exports.getTests = async (req, res) => {
     try {
@@ -56,7 +71,12 @@ exports.getTests = async (req, res) => {
 
         if (role === 'student' || role === 'parent') {
             const targetStudentId = role === 'parent' ? req.query.studentId : _id;
-            const attempts = await Attempt.find({ studentId: targetStudentId }).select('testId status score percentage').lean();
+            // Only surface real submissions — an in_progress attempt means the student
+            // merely opened the test and shouldn't be shown as "attempted".
+            const attempts = await Attempt.find({
+                studentId: targetStudentId,
+                status: { $in: ['submitted', 'graded'] },
+            }).select('testId status score percentage').lean();
             const attemptMap = {};
             attempts.forEach(a => { attemptMap[a.testId.toString()] = a; });
             const testsWithAttempt = tests.map(t => ({
@@ -88,11 +108,24 @@ exports.getTest = async (req, res) => {
         if (!test) return res.status(404).json({ message: 'Test not found' });
 
         if (req.user.role === 'student') {
-            // FIX #5: Block student from re-opening a test they already submitted
-            const Attempt = require('../models/Attempt');
+            // Batch access control: students can only open tests for their batch
+            const studentDoc = await User.findById(req.user._id).select('batchIds').lean();
+            if (!studentCanAccessTest(test, studentDoc?.batchIds)) {
+                return res.status(403).json({ message: 'Access denied: this test is not assigned to your batch' });
+            }
+
+            // Block re-opening a test that was already submitted/graded
             const existing = await Attempt.findOne({ studentId: req.user._id, testId: test._id });
             if (existing && existing.status !== 'in_progress') {
                 return res.status(400).json({ message: 'Already submitted' });
+            }
+
+            // Record a server-side start time so the elapsed time can't be faked.
+            // Only for attemptable tests; resumed attempts keep their original startedAt.
+            if (!existing && ['published', 'active'].includes(test.status)) {
+                try {
+                    await Attempt.create({ studentId: req.user._id, testId: test._id, status: 'in_progress' });
+                } catch (_) { /* unique index race — an attempt already exists, ignore */ }
             }
 
             const testObj = test.toObject();
@@ -103,7 +136,10 @@ exports.getTest = async (req, res) => {
             return res.json({ test: testObj });
         }
 
-        res.json({ test });
+        // Only Sir may fetch the raw test (it includes correctAnswer for each question).
+        // Parents review results via the results endpoints, not here.
+        if (req.user.role === 'sir') return res.json({ test });
+        return res.status(403).json({ message: 'Access denied' });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -116,7 +152,10 @@ exports.createTest = async (req, res) => {
         if (!name || !subject || !date || !duration)
             return res.status(400).json({ message: 'Required fields missing' });
 
-        const parsedTotalMarks = parseInt(totalMarks) || (questions?.reduce((sum, q) => sum + (parseInt(q.marks) || 0), 0)) || 0;
+        // Question marks are authoritative: if questions exist, totalMarks is their sum,
+        // so a student's percentage is always scored against the real attainable marks.
+        const questionMarksSum = questions?.reduce((sum, q) => sum + (parseInt(q.marks) || 0), 0) || 0;
+        const parsedTotalMarks = questionMarksSum > 0 ? questionMarksSum : (parseInt(totalMarks) || 0);
         if (!parsedTotalMarks) {
             return res.status(400).json({ message: 'Total marks must be greater than 0' });
         }
@@ -151,7 +190,8 @@ exports.createTest = async (req, res) => {
 // PUT /api/tests/:id — Sir: update test
 exports.updateTest = async (req, res) => {
     try {
-        const test = await Test.findOne({ _id: req.params.id, createdBy: req.user._id });
+        // Any Sir/admin may manage any test (consistent with grading & releasing)
+        const test = await Test.findById(req.params.id);
         if (!test) return res.status(404).json({ message: 'Test not found' });
 
         const { name, subject, batchId, date, duration, totalMarks, instructions, status } = req.body;
@@ -174,10 +214,12 @@ exports.updateTest = async (req, res) => {
 // POST /api/tests/:id/questions — add question to existing test
 exports.addQuestion = async (req, res) => {
     try {
-        const test = await Test.findOne({ _id: req.params.id, createdBy: req.user._id });
+        const test = await Test.findById(req.params.id);
         if (!test) return res.status(404).json({ message: 'Test not found' });
         const question = await Question.create({ ...req.body, createdBy: req.user._id });
         test.questions.push(question._id);
+        await test.save();
+        test.totalMarks = await recomputeTotalMarks(test._id);
         await test.save();
         res.status(201).json({ question });
     } catch (err) {
@@ -188,11 +230,13 @@ exports.addQuestion = async (req, res) => {
 // DELETE /api/tests/:id/questions/:qid
 exports.removeQuestion = async (req, res) => {
     try {
-        const test = await Test.findOne({ _id: req.params.id, createdBy: req.user._id });
+        const test = await Test.findById(req.params.id);
         if (!test) return res.status(404).json({ message: 'Test not found' });
         test.questions = test.questions.filter(q => q.toString() !== req.params.qid);
         await test.save();
         await Question.findByIdAndDelete(req.params.qid);
+        test.totalMarks = await recomputeTotalMarks(test._id);
+        await test.save();
         res.json({ message: 'Question removed' });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
@@ -207,11 +251,19 @@ exports.submitAttempt = async (req, res) => {
         if (!['published', 'active'].includes(test.status))
             return res.status(400).json({ message: 'Test not available' });
 
+        // Batch access control
+        const studentDoc = await User.findById(req.user._id).select('batchIds').lean();
+        if (!studentCanAccessTest(test, studentDoc?.batchIds)) {
+            return res.status(403).json({ message: 'Access denied: this test is not assigned to your batch' });
+        }
+
         const existing = await Attempt.findOne({ studentId: req.user._id, testId: test._id });
         if (existing && existing.status !== 'in_progress')
             return res.status(400).json({ message: 'Already submitted' });
 
-        const { answers, timeTaken } = req.body;
+        const { answers } = req.body;
+        if (!Array.isArray(answers))
+            return res.status(400).json({ message: 'Answers must be provided as a list' });
 
         let score = 0;
         const gradedAnswers = answers.map(ans => {
@@ -227,7 +279,11 @@ exports.submitAttempt = async (req, res) => {
             return { ...ans, isCorrect, marksAwarded };
         });
 
-        const percentage = Math.round((score / test.totalMarks) * 100);
+        const percentage = test.totalMarks ? Math.round((score / test.totalMarks) * 100) : 0;
+
+        // Trust the server clock for elapsed time, not the client-supplied value.
+        const startedAt = existing?.startedAt || new Date();
+        const timeTaken = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000));
 
         let attempt;
         if (existing) {
@@ -310,8 +366,21 @@ exports.getResults = async (req, res) => {
 // PATCH /api/tests/:id/release — Sir: release results
 exports.releaseResults = async (req, res) => {
     try {
-        const test = await Test.findOne({ _id: req.params.id, createdBy: req.user._id });
+        const test = await Test.findById(req.params.id).populate('questions', 'type');
         if (!test) return res.status(404).json({ message: 'Test not found' });
+
+        // If the test has subjective questions, every submitted attempt must be graded
+        // first — otherwise students would see deflated scores (subjective auto-scores as 0).
+        const hasSubjective = (test.questions || []).some(q => q.type === 'subjective');
+        if (hasSubjective) {
+            const ungraded = await Attempt.countDocuments({ testId: test._id, status: 'submitted' });
+            if (ungraded > 0) {
+                return res.status(400).json({
+                    message: `${ungraded} attempt(s) still have ungraded subjective answers. Please grade them before releasing results.`,
+                });
+            }
+        }
+
         test.status = 'results_released';
         test.resultsReleasedAt = new Date();
         await test.save();
@@ -331,12 +400,17 @@ exports.gradeAttempt = async (req, res) => {
         const answerIndex = attempt.answers.findIndex(a => a.questionId?.toString() === questionId);
         if (answerIndex === -1) return res.status(404).json({ message: 'Answer not found' });
 
+        // Clamp awarded marks to the question's valid range [0, maxMarks]
+        const question = await Question.findById(questionId).select('marks');
+        const maxMarks = question?.marks ?? Infinity;
+        const cleanMarks = Math.max(0, Math.min(Number(marksAwarded) || 0, maxMarks));
+
         const oldMarks = attempt.answers[answerIndex].marksAwarded || 0;
-        attempt.answers[answerIndex].marksAwarded = marksAwarded;
-        attempt.score = attempt.score - oldMarks + marksAwarded;
+        attempt.answers[answerIndex].marksAwarded = cleanMarks;
+        attempt.score = attempt.score - oldMarks + cleanMarks;
 
         const test = await Test.findById(attempt.testId);
-        attempt.percentage = Math.round((attempt.score / test.totalMarks) * 100);
+        attempt.percentage = test?.totalMarks ? Math.round((attempt.score / test.totalMarks) * 100) : 0;
         attempt.status = 'graded';
         await attempt.save();
 

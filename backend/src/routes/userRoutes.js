@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const { protect, authorize } = require('../middleware/auth');
+const { imageUpload: upload } = require('../middleware/upload');
 const ctrl = require('../controllers/userController');
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.get('/stats', protect, authorize('sir'), ctrl.getSirStats);
 router.get('/my-stats', protect, authorize('student'), ctrl.getStudentStats);

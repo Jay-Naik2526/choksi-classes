@@ -90,7 +90,8 @@ exports.createMaterial = async (req, res) => {
 // PUT /api/materials/:id
 exports.updateMaterial = async (req, res) => {
     try {
-        const material = await Material.findOne({ _id: req.params.id, uploadedBy: req.user._id });
+        // Any Sir/admin may edit any material (consistent with delete)
+        const material = await Material.findById(req.params.id);
         if (!material) return res.status(404).json({ message: 'Material not found' });
         const { title, subject, chapter, description } = req.body;
         if (title) material.title = title;

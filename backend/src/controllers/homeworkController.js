@@ -4,6 +4,14 @@ const User      = require('../models/User');
 const { uploadToDrive } = require('../utils/driveUpload');
 const { sendPushToMany, sendPushToUser } = require('../utils/pushNotifications');
 
+// A homework with no batch is for everyone; otherwise the student must be in that batch.
+// Handles hw.batchId being either an ObjectId or a populated { _id } object.
+const hwInBatch = (hw, batchIds = []) => {
+    const hbId = (hw.batchId?._id || hw.batchId)?.toString();
+    if (!hbId) return true;
+    return (batchIds || []).some(b => b.toString() === hbId);
+};
+
 // GET /api/homework
 exports.list = async (req, res) => {
     try {
@@ -71,6 +79,7 @@ exports.getOne = async (req, res) => {
 
         if (role === 'student' || role === 'parent') {
             let targetStudentId = _id;
+            let targetBatchIds = req.user.batchIds || [];
             if (role === 'parent') {
                 const studentId = req.query.studentId;
                 if (!studentId) {
@@ -82,6 +91,13 @@ exports.getOne = async (req, res) => {
                     return res.status(403).json({ message: 'Access denied: student is not linked to this parent' });
                 }
                 targetStudentId = studentId;
+                const studentDoc = await User.findById(studentId).select('batchIds').lean();
+                targetBatchIds = studentDoc?.batchIds || [];
+            }
+
+            // Batch access control: can't open homework for a batch you're not in
+            if (!hwInBatch(hw, targetBatchIds)) {
+                return res.status(403).json({ message: 'Access denied: this homework is not assigned to your batch' });
             }
 
             const sub = hw.submissions.find(
@@ -162,6 +178,11 @@ exports.submit = async (req, res) => {
     try {
         const hw = await Homework.findById(req.params.id);
         if (!hw || !hw.isActive) return res.status(404).json({ message: 'Not found' });
+
+        // Batch access control: can't submit to homework for a batch you're not in
+        if (!hwInBatch(hw, req.user.batchIds)) {
+            return res.status(403).json({ message: 'Access denied: this homework is not assigned to your batch' });
+        }
 
         const sid = req.user._id.toString();
         if (hw.submissions.some(s => s.studentId?.toString() === sid))

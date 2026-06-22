@@ -124,6 +124,11 @@ app.get('/',       (req, res) => res.json({ message: 'Choksi Classes API', versi
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
+    // Multer upload errors (e.g. file too large) → 400, not 500
+    if (err.name === 'MulterError') {
+        const msg = err.code === 'LIMIT_FILE_SIZE' ? 'File is too large' : 'File upload error';
+        return res.status(400).json({ message: msg });
+    }
     if (isProd) {
         console.error(`[ERROR] ${req.method} ${req.path} →`, err.message);
         return res.status(err.status || 500).json({ message: err.message || 'Something went wrong' });

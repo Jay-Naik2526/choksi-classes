@@ -4,7 +4,7 @@ const sendEmail = require('../utils/sendEmail');
 const generateOTP = require('../utils/generateOTP');
 
 const signToken = (id) =>
-    jwt.sign({ id }, process.env.JWT_SECRET);
+    jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
 // @POST /api/auth/login
 exports.login = async (req, res) => {
@@ -13,9 +13,15 @@ exports.login = async (req, res) => {
         if (!email || !password || !role)
             return res.status(400).json({ message: 'All fields required' });
 
-        const user = await User.findOne({ email, role });
+        // Look up by email only, verify password first, then check the selected role.
+        // This lets us give a clear message when the wrong role tab is chosen,
+        // without leaking whether the email exists (password check gates it).
+        const user = await User.findOne({ email });
         if (!user || !(await user.matchPassword(password)))
             return res.status(401).json({ message: 'Invalid credentials' });
+
+        if (user.role !== role)
+            return res.status(401).json({ message: `This account is registered as a ${user.role}. Please select the correct role.` });
 
         if (!user.isActive)
             return res.status(403).json({ message: 'Account deactivated' });
@@ -34,12 +40,16 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
+        const genericMsg = { message: 'If an account exists for that email, an OTP has been sent.' };
+
         const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: 'No account with that email' });
+        // Always return the same response to avoid leaking which emails are registered.
+        if (!user) return res.json(genericMsg);
 
         const otp = generateOTP();
         user.otp = otp;
         user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        user.otpAttempts = 0;                                   // reset guard for new OTP
         await user.save({ validateBeforeSave: false });
 
         await sendEmail({
@@ -55,7 +65,7 @@ exports.forgotPassword = async (req, res) => {
       `,
         });
 
-        res.json({ message: 'OTP sent to email' });
+        res.json(genericMsg);
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -65,16 +75,34 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
     try {
         const { email, otp, password } = req.body;
-        const user = await User.findOne({
-            email,
-            otp,
-            otpExpiry: { $gt: Date.now() },
-        });
-        if (!user) return res.status(400).json({ message: 'Invalid or expired OTP' });
+        if (!email || !otp || !password)
+            return res.status(400).json({ message: 'Email, OTP and new password are required' });
+        if (password.length < 8)
+            return res.status(400).json({ message: 'Password must be at least 8 characters' });
+
+        // Match by email + unexpired OTP only, so we can throttle wrong guesses.
+        const user = await User.findOne({ email, otpExpiry: { $gt: Date.now() } });
+        if (!user || !user.otp)
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+
+        // Lock out after 5 wrong attempts on the same OTP
+        if ((user.otpAttempts || 0) >= 5) {
+            user.otp = undefined;
+            user.otpExpiry = undefined;
+            await user.save({ validateBeforeSave: false });
+            return res.status(429).json({ message: 'Too many incorrect attempts. Please request a new OTP.' });
+        }
+
+        if (user.otp !== otp) {
+            user.otpAttempts = (user.otpAttempts || 0) + 1;
+            await user.save({ validateBeforeSave: false });
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
 
         user.password = password;
         user.otp = undefined;
         user.otpExpiry = undefined;
+        user.otpAttempts = 0;
         await user.save();
 
         res.json({ message: 'Password reset successful' });
@@ -94,8 +122,8 @@ exports.changePassword = async (req, res) => {
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword)
             return res.status(400).json({ message: 'Both fields required' });
-        if (newPassword.length < 6)
-            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+        if (newPassword.length < 8)
+            return res.status(400).json({ message: 'New password must be at least 8 characters' });
 
         const user = await User.findById(req.user._id);
         if (!(await user.matchPassword(currentPassword)))
